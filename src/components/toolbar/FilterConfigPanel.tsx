@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { useDropdownAlign } from '../../hooks/useDropdownAlign'
 import { getFilterDepth } from '../../lib/filter'
 import { FilterConditionRow } from './FilterConditionRow'
 import type { ColumnDef, FilterGroup, FilterCondition } from '../../types'
@@ -153,6 +154,7 @@ export function FilterConfigPanel({
   onClearAll,
   onClose,
 }: FilterConfigPanelProps) {
+  const { ref: panelRef, alignRight } = useDropdownAlign()
   const totalConditions = root.conditions.length + root.groups.reduce(
     (sum, g) => sum + g.conditions.length, 0,
   )
@@ -161,7 +163,7 @@ export function FilterConfigPanel({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
 
-      <div className="absolute top-full left-0 z-50 mt-1 w-[520px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl">
+      <div ref={panelRef} className={cn("absolute top-full z-50 mt-1 w-[520px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl", alignRight ? 'right-0' : 'left-0')}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-gray-200">Filters</span>

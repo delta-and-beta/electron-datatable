@@ -50,6 +50,9 @@ function evaluateCondition(record: RowData, condition: FilterCondition, columns:
   if (condition.operator === 'is_empty') return isEmpty(rawValue)
   if (condition.operator === 'is_not_empty') return !isEmpty(rawValue)
 
+  // Skip incomplete conditions (no value entered yet) — treat as "not configured"
+  if (condition.value === '') return true
+
   const colType = column.type
 
   if (colType === 'text' || colType === 'custom') return evaluateTextCondition(rawValue, condition)
@@ -89,14 +92,22 @@ function evaluateNumberCondition(rawValue: unknown, condition: FilterCondition):
   }
 }
 
+/** Local-time YYYY-MM-DD string — avoids UTC shift from toISOString() */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function evaluateDateCondition(rawValue: unknown, condition: FilterCondition): boolean {
   if (isEmpty(rawValue)) return false
   const recordDate = new Date(rawValue as string)
   const filterDate = new Date(condition.value)
   if (isNaN(recordDate.getTime()) || isNaN(filterDate.getTime())) return false
 
-  const rd = recordDate.toISOString().slice(0, 10)
-  const fd = filterDate.toISOString().slice(0, 10)
+  const rd = toLocalDateStr(recordDate)
+  const fd = toLocalDateStr(filterDate)
 
   switch (condition.operator) {
     case 'is': return rd === fd

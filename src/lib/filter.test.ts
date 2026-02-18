@@ -311,6 +311,54 @@ describe('filterRecords — conjunctions and nested groups', () => {
     expect(result.map((r) => r.id)).toEqual(['3'])
   })
 
+  it('nested groups — OR with AND subgroup', () => {
+    const group: FilterGroup = {
+      ...createEmptyGroup(),
+      conjunction: 'or',
+      conditions: [
+        { id: '1', field: 'name', operator: 'is', value: 'Alice' },
+      ],
+      groups: [{
+        ...createEmptyGroup(),
+        conjunction: 'and',
+        conditions: [
+          { id: '2', field: 'name', operator: 'contains', value: 'b' },
+          { id: '3', field: 'amount', operator: 'gt', value: '100' },
+        ],
+      }],
+    }
+    // Alice matches root condition; Bob matches both sub-conditions (contains 'b' AND amount>100)
+    const result = filterRecords(data, group, columns)
+    expect(result.map((r) => r.id)).toEqual(['1', '2'])
+  })
+
+  it('AND with mixed text and date conditions', () => {
+    const group: FilterGroup = {
+      ...createEmptyGroup(),
+      conjunction: 'and',
+      conditions: [
+        { id: '1', field: 'name', operator: 'contains', value: 'li' },
+        { id: '2', field: 'date', operator: 'is', value: '2024-01-15' },
+      ],
+    }
+    const result = filterRecords(data, group, columns)
+    expect(result.map((r) => r.id)).toEqual(['1'])
+  })
+
+  it('empty value condition is skipped (treated as incomplete)', () => {
+    const group: FilterGroup = {
+      ...createEmptyGroup(),
+      conjunction: 'and',
+      conditions: [
+        { id: '1', field: 'name', operator: 'contains', value: 'ali' },
+        { id: '2', field: 'date', operator: 'is', value: '' },
+      ],
+    }
+    // The empty date condition should be skipped, not reject everything
+    const result = filterRecords(data, group, columns)
+    expect(result.map((r) => r.id)).toEqual(['1', '5'])
+  })
+
   it('returns all records when no conditions exist', () => {
     const group = createEmptyGroup()
     const result = filterRecords(data, group, columns)
