@@ -23,6 +23,7 @@ export interface ColumnDef<T extends RowData = RowData> {
   groupable?: boolean
   searchable?: boolean
   visible?: boolean
+  filterable?: boolean
 
   // Grouping
   datePeriods?: DatePeriod[]
@@ -57,6 +58,40 @@ export interface GroupedSection {
   sums: Record<string, number>
   records: RowData[]
   subgroups: GroupedSection[]
+}
+
+/** Filter operators for text columns */
+export type TextOperator = 'is' | 'is_not' | 'contains' | 'does_not_contain' | 'is_empty' | 'is_not_empty'
+
+/** Filter operators for number/currency columns */
+export type NumberOperator = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'is_empty' | 'is_not_empty'
+
+/** Filter operators for date columns */
+export type DateOperator = 'is' | 'is_before' | 'is_after' | 'is_on_or_before' | 'is_on_or_after' | 'is_empty' | 'is_not_empty'
+
+/** Union of all filter operators */
+export type FilterOperator = TextOperator | NumberOperator | DateOperator
+
+/** A single filter condition: field + operator + value */
+export interface FilterCondition {
+  id: string
+  field: string
+  operator: FilterOperator
+  value: string
+}
+
+/** A group of conditions joined by a single conjunction, with optional nested sub-groups */
+export interface FilterGroup {
+  id: string
+  conjunction: 'and' | 'or'
+  conditions: FilterCondition[]
+  groups: FilterGroup[]
+}
+
+/** Root filter configuration (persisted to localStorage) */
+export interface FilterConfig {
+  root: FilterGroup
+  enabled: boolean
 }
 
 /** Attachment adapter — consumers implement for their storage backend */
