@@ -7,6 +7,7 @@ import { useGroupBy } from '../hooks/useGroupBy'
 import { useColumns } from '../hooks/useColumns'
 import { useSearch } from '../hooks/useSearch'
 import { useSort } from '../hooks/useSort'
+import { useFilter } from '../hooks/useFilter'
 import { Toolbar } from './Toolbar'
 import { Content } from './Content'
 import { Footer } from './Footer'
@@ -15,6 +16,8 @@ import { GroupByToolbarButton } from './toolbar/GroupByToolbarButton'
 import { GroupByConfigPanel } from './toolbar/GroupByConfigPanel'
 import { ColumnToggle } from './toolbar/ColumnToggle'
 import { DateFilter } from './toolbar/DateFilter'
+import { FilterToolbarButton } from './toolbar/FilterToolbarButton'
+import { FilterConfigPanel } from './toolbar/FilterConfigPanel'
 import { GroupHeader } from './headers/GroupHeader'
 
 function DataTableRoot<T extends RowData = RowData>({
@@ -31,8 +34,11 @@ function DataTableRoot<T extends RowData = RowData>({
   className,
   children,
 }: DataTableProps<T>) {
-  // Search
-  const search = useSearch({ data, columns })
+  // Filter (condition-based)
+  const filter = useFilter({ data, columns, storageKey })
+
+  // Search (free-text, on filtered data)
+  const search = useSearch({ data: filter.filteredData, columns })
 
   // Sort
   const sort = useSort({
@@ -80,6 +86,7 @@ function DataTableRoot<T extends RowData = RowData>({
       columns,
       columnState,
       groupBy,
+      filter,
       dateFilter,
       setDateFilter,
       attachmentAdapter: attachmentAdapter ?? null,
@@ -98,6 +105,7 @@ function DataTableRoot<T extends RowData = RowData>({
       columns,
       columnState,
       groupBy,
+      filter,
       dateFilter,
       attachmentAdapter,
       attachmentCounts,
@@ -139,12 +147,15 @@ function DataTableRoot<T extends RowData = RowData>({
 /** Full preset layout: toolbar + content + footer */
 function FullPreset({ onRowClick }: { onRowClick?: (row: RowData) => void }) {
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false)
 
   return (
     <>
       <FullPresetToolbar
         groupMenuOpen={groupMenuOpen}
         setGroupMenuOpen={setGroupMenuOpen}
+        filterMenuOpen={filterMenuOpen}
+        setFilterMenuOpen={setFilterMenuOpen}
       />
       <div className="overflow-auto h-full">
         <Content stickyHeader onRowClick={onRowClick} />
@@ -157,17 +168,46 @@ function FullPreset({ onRowClick }: { onRowClick?: (row: RowData) => void }) {
 function FullPresetToolbar({
   groupMenuOpen,
   setGroupMenuOpen,
+  filterMenuOpen,
+  setFilterMenuOpen,
 }: {
   groupMenuOpen: boolean
   setGroupMenuOpen: (open: boolean) => void
+  filterMenuOpen: boolean
+  setFilterMenuOpen: (open: boolean) => void
 }) {
-  const { groupBy, columns } = useDataTable()
+  const { groupBy, filter, columns } = useDataTable()
   const groupableColumns = columns.filter((c) => c.groupable !== false)
 
   return (
     <Toolbar>
       <Search className="w-80" />
       <div className="flex items-center gap-3">
+        <div className="relative">
+          <FilterToolbarButton
+            activeCount={filter.activeCount}
+            enabled={filter.enabled}
+            isOpen={filterMenuOpen}
+            onClick={() => setFilterMenuOpen(!filterMenuOpen)}
+            onToggleEnabled={filter.setEnabled}
+          />
+          {filterMenuOpen && (
+            <FilterConfigPanel
+              root={filter.root}
+              columns={columns}
+              enabled={filter.enabled}
+              onSetEnabled={filter.setEnabled}
+              onAddCondition={filter.addCondition}
+              onRemoveCondition={filter.removeCondition}
+              onUpdateCondition={filter.updateCondition}
+              onAddGroup={filter.addGroup}
+              onRemoveGroup={filter.removeGroup}
+              onUpdateConjunction={filter.updateConjunction}
+              onClearAll={filter.clearAll}
+              onClose={() => setFilterMenuOpen(false)}
+            />
+          )}
+        </div>
         <div className="relative">
           <GroupByToolbarButton
             activeCount={groupBy.levels.length}
@@ -206,5 +246,7 @@ export const DataTable = Object.assign(DataTableRoot, {
   GroupByPanel: GroupByConfigPanel,
   ColumnToggle,
   DateFilter,
+  Filter: FilterToolbarButton,
+  FilterPanel: FilterConfigPanel,
   GroupHeader,
 })

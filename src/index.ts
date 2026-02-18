@@ -9,16 +9,25 @@ export type {
   AttachmentAdapter,
   Attachment,
   DataTableProps,
+  TextOperator,
+  NumberOperator,
+  DateOperator,
+  FilterOperator,
+  FilterCondition,
+  FilterGroup,
+  FilterConfig,
 } from './types'
 
 // Pure logic (framework-agnostic)
 export { groupRecords, getGroupKey, getDatePeriodKey, sortGroups } from './lib/group-by'
+export { filterRecords, getOperatorsForColumnType, createEmptyCondition, createEmptyGroup, getFilterDepth, countConditions } from './lib/filter'
 
 // React hooks (individually importable)
 export { useGroupBy } from './hooks/useGroupBy'
 export { useColumns } from './hooks/useColumns'
 export { useSearch } from './hooks/useSearch'
 export { useSort } from './hooks/useSort'
+export { useFilter } from './hooks/useFilter'
 
 // Context
 export { DataTableProvider, useDataTable } from './context'
@@ -35,6 +44,9 @@ export { GroupByConfigPanel } from './components/toolbar/GroupByConfigPanel'
 export { Search } from './components/toolbar/Search'
 export { ColumnToggle } from './components/toolbar/ColumnToggle'
 export { DateFilter } from './components/toolbar/DateFilter'
+export { FilterToolbarButton } from './components/toolbar/FilterToolbarButton'
+export { FilterConfigPanel } from './components/toolbar/FilterConfigPanel'
+export { FilterConditionRow } from './components/toolbar/FilterConditionRow'
 export { GroupHeader } from './components/headers/GroupHeader'
 
 // Table primitives

@@ -3,6 +3,7 @@ import type { RowData, ColumnDef, GroupedSection, AttachmentAdapter } from './ty
 import type { useGroupBy } from './hooks/useGroupBy'
 import type { useColumns } from './hooks/useColumns'
 import type { useSort } from './hooks/useSort'
+import type { useFilter } from './hooks/useFilter'
 
 export interface DataTableContextValue<T extends RowData = RowData> {
   // Data pipeline
@@ -24,6 +25,9 @@ export interface DataTableContextValue<T extends RowData = RowData> {
 
   // Group-by
   groupBy: ReturnType<typeof useGroupBy<T>>
+
+  // Condition filter
+  filter: ReturnType<typeof useFilter<T>>
 
   // Date filter
   dateFilter: { field: string; start?: Date; end?: Date } | null
