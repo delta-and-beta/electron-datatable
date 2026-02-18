@@ -1,15 +1,23 @@
 // Compound component root — wires together all hooks and provides context
-// Full implementation will be built incrementally
 
 import { useMemo, useState } from 'react'
 import type { RowData, DataTableProps } from '../types'
-import { DataTableProvider, type DataTableContextValue } from '../context'
+import { DataTableProvider, useDataTable, type DataTableContextValue } from '../context'
 import { useGroupBy } from '../hooks/useGroupBy'
 import { useColumns } from '../hooks/useColumns'
 import { useSearch } from '../hooks/useSearch'
 import { useSort } from '../hooks/useSort'
+import { Toolbar } from './Toolbar'
+import { Content } from './Content'
+import { Footer } from './Footer'
+import { Search } from './toolbar/Search'
+import { GroupByToolbarButton } from './toolbar/GroupByToolbarButton'
+import { GroupByConfigPanel } from './toolbar/GroupByConfigPanel'
+import { ColumnToggle } from './toolbar/ColumnToggle'
+import { DateFilter } from './toolbar/DateFilter'
+import { GroupHeader } from './headers/GroupHeader'
 
-export function DataTable<T extends RowData = RowData>({
+function DataTableRoot<T extends RowData = RowData>({
   data,
   columns,
   rowKey,
@@ -56,7 +64,7 @@ export function DataTable<T extends RowData = RowData>({
     end?: Date
   } | null>(null)
 
-  // Attachment counts (stub — will be populated by Content component)
+  // Attachment counts
   const [attachmentCounts] = useState<Record<string, number>>({})
 
   // Build context value
@@ -98,13 +106,24 @@ export function DataTable<T extends RowData = RowData>({
     ],
   )
 
-  // Preset rendering
+  // Preset: full — renders complete toolbar + content + footer
   if (preset === 'full' && !children) {
     return (
       <DataTableProvider value={contextValue as DataTableContextValue}>
         <div className={className}>
-          {/* TODO: Full preset layout */}
-          <p>DataTable full preset — implementation pending</p>
+          <FullPreset onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
+        </div>
+      </DataTableProvider>
+    )
+  }
+
+  // Preset: minimal — content + footer only, no toolbar
+  if (preset === 'minimal' && !children) {
+    return (
+      <DataTableProvider value={contextValue as DataTableContextValue}>
+        <div className={className}>
+          <Content onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
+          <Footer />
         </div>
       </DataTableProvider>
     )
@@ -116,3 +135,76 @@ export function DataTable<T extends RowData = RowData>({
     </DataTableProvider>
   )
 }
+
+/** Full preset layout: toolbar + content + footer */
+function FullPreset({ onRowClick }: { onRowClick?: (row: RowData) => void }) {
+  const [groupMenuOpen, setGroupMenuOpen] = useState(false)
+
+  return (
+    <>
+      <FullPresetToolbar
+        groupMenuOpen={groupMenuOpen}
+        setGroupMenuOpen={setGroupMenuOpen}
+      />
+      <div className="overflow-auto h-full">
+        <Content stickyHeader onRowClick={onRowClick} />
+        <Footer />
+      </div>
+    </>
+  )
+}
+
+function FullPresetToolbar({
+  groupMenuOpen,
+  setGroupMenuOpen,
+}: {
+  groupMenuOpen: boolean
+  setGroupMenuOpen: (open: boolean) => void
+}) {
+  const { groupBy, columns } = useDataTable()
+  const groupableColumns = columns.filter((c) => c.groupable !== false)
+
+  return (
+    <Toolbar>
+      <Search className="w-80" />
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <GroupByToolbarButton
+            activeCount={groupBy.levels.length}
+            isOpen={groupMenuOpen}
+            onClick={() => setGroupMenuOpen(!groupMenuOpen)}
+          />
+          {groupMenuOpen && (
+            <GroupByConfigPanel
+              levels={groupBy.levels}
+              columns={groupableColumns}
+              onAddGroup={groupBy.addGroup}
+              onRemoveGroup={groupBy.removeGroup}
+              onUpdateGroup={groupBy.updateGroup}
+              onReorderGroups={groupBy.reorderGroups}
+              onCollapseAll={groupBy.collapseAll}
+              onExpandAll={groupBy.expandAll}
+              showEmpty={groupBy.showEmpty}
+              onToggleShowEmpty={groupBy.setShowEmpty}
+              onClose={() => setGroupMenuOpen(false)}
+            />
+          )}
+        </div>
+        <ColumnToggle />
+      </div>
+    </Toolbar>
+  )
+}
+
+// Compound component with sub-components attached
+export const DataTable = Object.assign(DataTableRoot, {
+  Toolbar,
+  Content,
+  Footer,
+  Search,
+  GroupBy: GroupByToolbarButton,
+  GroupByPanel: GroupByConfigPanel,
+  ColumnToggle,
+  DateFilter,
+  GroupHeader,
+})

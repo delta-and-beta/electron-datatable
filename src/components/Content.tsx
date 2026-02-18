@@ -1,0 +1,247 @@
+import { Fragment } from 'react'
+import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { cn } from '../lib/utils'
+import { formatDate, formatNumber, formatCurrency } from '../lib/format'
+import { useDataTable } from '../context'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table'
+import { GroupHeader } from './headers'
+import type { RowData, ColumnDef, GroupedSection } from '../types'
+
+/* ---------------------------------------------------------------------------
+ * Props
+ * --------------------------------------------------------------------------- */
+
+interface ContentProps {
+  emptyMessage?: string
+  stickyHeader?: boolean
+  rowClassName?: (row: RowData) => string | undefined
+  className?: string
+  renderCell?: (column: ColumnDef, value: unknown, row: RowData) => React.ReactNode
+  onRowClick?: (row: RowData) => void
+  sumField?: string
+  sumLabel?: string
+}
+
+/* ---------------------------------------------------------------------------
+ * Default cell rendering
+ * --------------------------------------------------------------------------- */
+
+function defaultRenderCell(column: ColumnDef, value: unknown): React.ReactNode {
+  if (column.render) {
+    return column.render(value, {} as RowData)
+  }
+
+  if (column.format) {
+    return column.format(value)
+  }
+
+  if (value == null) return '-'
+
+  switch (column.type) {
+    case 'date':
+      return formatDate(value as string | Date)
+    case 'number':
+      return formatNumber(value as number)
+    case 'currency':
+      return formatCurrency(value as number, column.currency)
+    case 'text':
+    default:
+      return String(value)
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Content
+ * --------------------------------------------------------------------------- */
+
+export function Content({
+  emptyMessage = 'No records found',
+  stickyHeader = true,
+  rowClassName,
+  className,
+  renderCell,
+  onRowClick,
+  sumField,
+  sumLabel,
+}: ContentProps) {
+  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey } = useDataTable()
+
+  // Resolve visible columns in display order
+  const visibleColumns = columnState.visibleColumns
+    .map((id) => columns.find((c) => c.id === id))
+    .filter((c): c is ColumnDef => c !== undefined)
+
+  const colSpan = visibleColumns.length
+  const isGrouped = groupBy.isGrouped
+  const isEmpty = sortedData.length === 0
+
+  /* -----------------------------------------------------------------------
+   * Render a single data row
+   * ----------------------------------------------------------------------- */
+
+  function renderRow(row: RowData, index: number) {
+    const key = row[rowKey] != null ? String(row[rowKey]) : index
+
+    return (
+      <TableRow
+        key={key}
+        data-row-id={row[rowKey] != null ? String(row[rowKey]) : undefined}
+        className={cn(
+          onRowClick && 'cursor-pointer',
+          rowClassName?.(row),
+        )}
+        onClick={onRowClick ? () => onRowClick(row) : undefined}
+      >
+        {visibleColumns.map((col) => {
+          const value = row[col.id]
+          return (
+            <TableCell
+              key={col.id}
+              className={cn(
+                col.align === 'right' && 'text-right',
+                col.align === 'center' && 'text-center',
+              )}
+              style={col.width ? { width: col.width } : undefined}
+            >
+              {renderCell
+                ? renderCell(col, value, row)
+                : col.render
+                  ? col.render(value, row)
+                  : defaultRenderCell(col, value)}
+            </TableCell>
+          )
+        })}
+      </TableRow>
+    )
+  }
+
+  /* -----------------------------------------------------------------------
+   * Recursive subgroup rendering
+   * ----------------------------------------------------------------------- */
+
+  function renderSubgroup(
+    section: GroupedSection,
+    parentPath: string,
+  ): React.ReactNode {
+    const path = parentPath ? `${parentPath}/${section.key}` : section.key
+    const collapsed = groupBy.isCollapsed(path)
+    const sumAmount = sumField ? section.sums[sumField] : undefined
+
+    return (
+      <Fragment key={path}>
+        <GroupHeader
+          groupKey={section.key}
+          fieldLabel={section.fieldLabel}
+          level={section.level}
+          count={section.count}
+          sumAmount={sumAmount}
+          sumLabel={sumLabel}
+          isCollapsed={collapsed}
+          onToggle={() => groupBy.toggleCollapse(path)}
+          colSpan={colSpan}
+        />
+
+        {!collapsed && (
+          <>
+            {section.subgroups.length > 0
+              ? section.subgroups.map((sub) => renderSubgroup(sub, path))
+              : section.records.map((row, i) => renderRow(row, i))}
+          </>
+        )}
+      </Fragment>
+    )
+  }
+
+  /* -----------------------------------------------------------------------
+   * Sort indicator
+   * ----------------------------------------------------------------------- */
+
+  function renderSortIcon(columnId: string) {
+    if (sort.sortField !== columnId) {
+      return <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 text-dt-muted/50" />
+    }
+    return sort.sortDirection === 'asc' ? (
+      <ArrowUp className="ml-1 inline h-3.5 w-3.5 text-dt-primary" />
+    ) : (
+      <ArrowDown className="ml-1 inline h-3.5 w-3.5 text-dt-primary" />
+    )
+  }
+
+  /* -----------------------------------------------------------------------
+   * Render
+   * ----------------------------------------------------------------------- */
+
+  return (
+    <Table className={className}>
+      <TableHeader className={cn(stickyHeader && 'sticky top-0 z-20 bg-dt-bg')}>
+        <TableRow>
+          {visibleColumns.map((col) => (
+            <TableHead
+              key={col.id}
+              className={cn(
+                col.sortable !== false && 'cursor-pointer select-none',
+                col.align === 'right' && 'text-right',
+                col.align === 'center' && 'text-center',
+              )}
+              style={col.width ? { width: col.width } : undefined}
+              onClick={
+                col.sortable !== false
+                  ? () => sort.setSort(col.id)
+                  : undefined
+              }
+            >
+              {col.headerRender ? col.headerRender() : col.label}
+              {col.sortable !== false && renderSortIcon(col.id)}
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+
+      {isEmpty ? (
+        <TableBody>
+          <TableRow>
+            <TableCell colSpan={colSpan} className="h-32 text-center text-dt-muted">
+              {emptyMessage}
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      ) : isGrouped ? (
+        groupedData.map((section) => {
+          const path = section.key
+          const collapsed = groupBy.isCollapsed(path)
+          const sumAmount = sumField ? section.sums[sumField] : undefined
+
+          return (
+            <TableBody key={path}>
+              <GroupHeader
+                groupKey={section.key}
+                fieldLabel={section.fieldLabel}
+                level={section.level}
+                count={section.count}
+                sumAmount={sumAmount}
+                sumLabel={sumLabel}
+                isCollapsed={collapsed}
+                onToggle={() => groupBy.toggleCollapse(path)}
+                colSpan={colSpan}
+              />
+
+              {!collapsed && (
+                <>
+                  {section.subgroups.length > 0
+                    ? section.subgroups.map((sub) => renderSubgroup(sub, path))
+                    : section.records.map((row, i) => renderRow(row, i))}
+                </>
+              )}
+            </TableBody>
+          )
+        })
+      ) : (
+        <TableBody>
+          {sortedData.map((row, i) => renderRow(row, i))}
+        </TableBody>
+      )}
+    </Table>
+  )
+}
+
+Content.displayName = 'Content'
