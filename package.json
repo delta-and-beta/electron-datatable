@@ -4,17 +4,17 @@
   "description": "A feature-rich, composable React data table with multi-level grouping, attachments, search, and column management",
   "type": "module",
   "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
+      "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
     "./tailwind": {
       "types": "./dist/tailwind.d.ts",
-      "import": "./dist/tailwind.mjs",
+      "import": "./dist/tailwind.js",
       "require": "./dist/tailwind.cjs"
     }
   },
