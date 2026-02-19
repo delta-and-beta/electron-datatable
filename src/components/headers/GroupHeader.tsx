@@ -1,19 +1,8 @@
-import { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '../../lib/utils'
-
-/* ---------------------------------------------------------------------------
- * Default sum formatter
- * --------------------------------------------------------------------------- */
-
-function defaultFormatSum(amount: number, label?: string): string {
-  const sign = amount < 0 ? '-' : '+'
-  const formatted = Math.abs(amount).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-  return label ? `${sign}${label} ${formatted}` : `${sign}${formatted}`
-}
+import { formatAggregateValue } from '../../lib/format-aggregate'
+import type { ColumnDef } from '../../types'
 
 /* ---------------------------------------------------------------------------
  * Props
@@ -28,20 +17,18 @@ export interface GroupHeaderProps {
   level: number
   /** Number of records in this group */
   count: number
-  /** Optional aggregated sum to display */
-  sumAmount?: number
-  /** Optional label for the sum (e.g., "HKD") */
-  sumLabel?: string
+  /** Visible columns to render cells for */
+  columns: ColumnDef[]
+  /** Aggregated sums keyed by column id */
+  sums: Record<string, number>
   /** Whether this group is collapsed */
   isCollapsed: boolean
   /** Toggle collapse/expand */
   onToggle: () => void
-  /** Number of columns the header should span */
-  colSpan: number
   /** Pixel offset from the top for sticky positioning (default: 39 = thead height) */
   stickyOffset?: number
-  /** Custom formatter for the sum display */
-  formatSum?: (amount: number) => string
+  /** Optional cell renderer matching Content's renderCell pipeline */
+  renderCell?: (column: ColumnDef, value: unknown) => React.ReactNode
 }
 
 /* ---------------------------------------------------------------------------
@@ -62,6 +49,11 @@ function findScrollParent(el: HTMLElement): HTMLElement | null {
   return null
 }
 
+/** Check whether a column should show an aggregated sum */
+function isAggregatable(col: ColumnDef): boolean {
+  return (col.type === 'currency' || col.type === 'number') && col.sumInGroup !== false
+}
+
 /* ---------------------------------------------------------------------------
  * GroupHeader
  *
@@ -76,16 +68,17 @@ export function GroupHeader({
   fieldLabel,
   level,
   count,
-  sumAmount,
-  sumLabel,
+  columns,
+  sums,
   isCollapsed,
   onToggle,
-  colSpan,
   stickyOffset = 39,
-  formatSum,
+  renderCell,
 }: GroupHeaderProps) {
-  const sentinelRef = useRef<HTMLTableRowElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLTableRowElement>(null)
+  const cellRef = useRef<HTMLTableRowElement>(null)
+  const isStuckRef = useRef(false)
   const [isStuck, setIsStuck] = useState(false)
 
   useEffect(() => {
@@ -108,47 +101,48 @@ export function GroupHeader({
         const sentinelRect = sentinel.getBoundingClientRect()
         const topThreshold = containerRect.top + stickyOffset
 
-        // Determine if this header is stuck
+        // Only update React state on transitions to avoid re-renders
         const stuck = sentinelRect.top < topThreshold
-        setIsStuck(stuck)
+        if (isStuckRef.current !== stuck) {
+          isStuckRef.current = stuck
+          setIsStuck(stuck)
+        }
 
-        // Push-up: find the next sentinel in DOM order and calculate overlap
-        const cell = header.querySelector('td') as HTMLTableCellElement | null
-        if (!cell) return
+        // Push-up: use cellRef (the visible <tr>) to get all <td>s
+        const row = cellRef.current
+        if (!row) return
+        const cells = row.querySelectorAll<HTMLTableCellElement>('td')
+        if (cells.length === 0) return
 
         if (stuck) {
-          // Find the next group sentinel after this one
-          const allSentinels = scrollParent!.querySelectorAll<HTMLElement>(
-            '[data-group-sentinel]'
+          // Find the next group sentinel using indexOf (bulletproof)
+          const allSentinels = Array.from(
+            scrollParent!.querySelectorAll<HTMLElement>('[data-group-sentinel]')
           )
-          let nextSentinel: HTMLElement | null = null
-          let found = false
-          for (const s of allSentinels) {
-            if (found) {
-              nextSentinel = s
-              break
-            }
-            if (s === sentinel.querySelector('[data-group-sentinel]')) {
-              found = true
-            }
-          }
+          const myIndex = allSentinels.indexOf(sentinel)
+          const nextSentinel = myIndex >= 0 ? allSentinels[myIndex + 1] : undefined
 
           if (nextSentinel) {
             const nextRect = nextSentinel.getBoundingClientRect()
-            const headerHeight = header.getBoundingClientRect().height
+            const headerHeight = row.getBoundingClientRect().height
             const overlap = topThreshold + headerHeight - nextRect.top
 
-            if (overlap > 0) {
-              // Push the header up by the overlap amount
-              cell.style.top = `${stickyOffset - overlap}px`
-            } else {
-              cell.style.top = `${stickyOffset}px`
-            }
+            const top = overlap > 0 ? stickyOffset - overlap : stickyOffset
+            row.style.top = `${top}px`
+            cells.forEach((cell) => {
+              cell.style.top = `${top}px`
+            })
           } else {
-            cell.style.top = `${stickyOffset}px`
+            row.style.top = `${stickyOffset}px`
+            cells.forEach((cell) => {
+              cell.style.top = `${stickyOffset}px`
+            })
           }
         } else {
-          cell.style.top = `${stickyOffset}px`
+          row.style.top = `${stickyOffset}px`
+          cells.forEach((cell) => {
+            cell.style.top = `${stickyOffset}px`
+          })
         }
       })
     }
@@ -167,88 +161,116 @@ export function GroupHeader({
 
   const paddingLeft = 16 + level * 24
 
-  const formattedSum =
-    sumAmount !== undefined
-      ? formatSum
-        ? formatSum(sumAmount)
-        : defaultFormatSum(sumAmount, sumLabel)
-      : null
+  const bgClass = isStuck ? 'bg-dt-bg/80' : 'bg-dt-bg-secondary'
 
   return (
     <>
       {/* Sentinel row — invisible, used for sticky detection */}
       <tr
-        ref={sentinelRef}
+        ref={headerRef}
         aria-hidden="true"
         style={{ height: 0, padding: 0, border: 'none' }}
       >
-        <td colSpan={colSpan} style={{ height: 0, padding: 0, border: 'none' }}>
-          <div data-group-sentinel="" style={{ height: 0 }} />
+        <td colSpan={columns.length} style={{ height: 0, padding: 0, border: 'none' }}>
+          <div ref={sentinelRef} data-group-sentinel="" style={{ height: 0 }} />
         </td>
       </tr>
 
       {/* Visible sticky header row */}
       <tr
-        ref={headerRef}
-        className="group/header sticky z-10 cursor-pointer"
+        ref={cellRef}
+        className={cn(
+          'group/header sticky z-10 cursor-pointer',
+        )}
         style={{ top: stickyOffset }}
         onClick={onToggle}
       >
-        <td
-          colSpan={colSpan}
-          className={cn(
-            'sticky px-2 py-1.5 transition-colors duration-150',
-            isStuck
-              ? 'bg-dt-bg/80 shadow-[0_1px_3px_rgba(0,0,0,0.3)] backdrop-blur-sm'
-              : 'bg-dt-bg-secondary'
-          )}
-          style={{
-            top: stickyOffset,
-            paddingLeft,
-          }}
-        >
-          <div className="flex items-center gap-2">
-            {/* Collapse/expand chevron */}
-            <span className="flex-shrink-0 text-dt-muted">
-              {isCollapsed ? (
-                <ChevronRight className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </span>
+        {columns.map((col, idx) => {
+          const isFirst = idx === 0
 
-            {/* Field label badge (subgroups only) */}
-            {level > 0 && (
-              <span className="flex-shrink-0 rounded bg-dt-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-dt-muted">
-                {fieldLabel}
-              </span>
-            )}
-
-            {/* Group key */}
-            <span className="truncate font-semibold text-dt-text">
-              {groupKey}
-            </span>
-
-            {/* Record count badge */}
-            <span className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs text-dt-muted ring-1 ring-dt-border">
-              {count}
-            </span>
-
-            {/* Sum display (right-aligned) */}
-            {formattedSum !== null && (
-              <span
-                className={cn(
-                  'ml-auto flex-shrink-0 tabular-nums',
-                  sumAmount !== undefined && sumAmount < 0
-                    ? 'text-dt-negative'
-                    : 'text-dt-positive'
-                )}
+          // The first cell is always reserved for the group label (chevron +
+          // badge + key + count), even if the underlying column is aggregatable.
+          if (isFirst) {
+            return (
+              <td
+                key={col.id}
+                className={cn('sticky py-1.5 pr-4 transition-colors duration-150', bgClass)}
+                style={{
+                  top: stickyOffset,
+                  paddingLeft,
+                  width: col.width,
+                }}
               >
-                {formattedSum}
-              </span>
-            )}
-          </div>
-        </td>
+                <div className="flex items-center gap-2">
+                  {/* Collapse/expand chevron */}
+                  <span className="flex-shrink-0 text-dt-muted">
+                    {isCollapsed ? (
+                      <ChevronRight className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </span>
+
+                  {/* Field label badge (subgroups only) */}
+                  {level > 0 && (
+                    <span className="flex-shrink-0 rounded bg-dt-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-dt-muted">
+                      {fieldLabel}
+                    </span>
+                  )}
+
+                  {/* Group key */}
+                  <span className="truncate font-semibold text-dt-text">
+                    {groupKey}
+                  </span>
+
+                  {/* Record count badge */}
+                  <span className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs text-dt-muted ring-1 ring-dt-border">
+                    {count}
+                  </span>
+                </div>
+              </td>
+            )
+          }
+
+          if (isAggregatable(col) && sums[col.id] !== undefined) {
+            // Aggregatable cell: show formatted sum with positive/negative color
+            const value = sums[col.id]
+            return (
+              <td
+                key={col.id}
+                className={cn(
+                  'sticky px-4 py-1.5 tabular-nums transition-colors duration-150',
+                  bgClass,
+                  col.align === 'right' && 'text-right',
+                  col.align === 'center' && 'text-center',
+                  value < 0 ? 'text-dt-negative' : 'text-dt-positive',
+                )}
+                style={{
+                  top: stickyOffset,
+                  width: col.width,
+                }}
+              >
+                {renderCell
+                  ? renderCell(col, value)
+                  : col.render
+                    ? col.render(value, {} as Record<string, unknown>)
+                    : formatAggregateValue(col, value)}
+              </td>
+            )
+          }
+
+          // Other cells: empty
+          return (
+            <td
+              key={col.id}
+              className={cn('sticky px-4 py-1.5 transition-colors duration-150', bgClass)}
+              style={{
+                top: stickyOffset,
+                width: col.width,
+              }}
+            />
+          )
+        })}
       </tr>
     </>
   )

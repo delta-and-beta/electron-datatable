@@ -21,6 +21,7 @@ export type {
 // Pure logic (framework-agnostic)
 export { groupRecords, getGroupKey, getDatePeriodKey, sortGroups } from './lib/group-by'
 export { filterRecords, getOperatorsForColumnType, createEmptyCondition, createEmptyGroup, getFilterDepth, countConditions } from './lib/filter'
+export { formatAggregateValue } from './lib/format-aggregate'
 
 // React hooks (individually importable)
 export { useGroupBy } from './hooks/useGroupBy'

@@ -18,8 +18,6 @@ interface ContentProps {
   className?: string
   renderCell?: (column: ColumnDef, value: unknown, row: RowData) => React.ReactNode
   onRowClick?: (row: RowData) => void
-  sumField?: string
-  sumLabel?: string
 }
 
 /* ---------------------------------------------------------------------------
@@ -61,8 +59,6 @@ export function Content({
   className,
   renderCell,
   onRowClick,
-  sumField,
-  sumLabel,
 }: ContentProps) {
   const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey } = useDataTable()
 
@@ -74,6 +70,11 @@ export function Content({
   const colSpan = visibleColumns.length
   const isGrouped = groupBy.isGrouped
   const isEmpty = sortedData.length === 0
+
+  // Aggregate cell renderer — same pipeline as data cells but without a row
+  const renderAggregateCell = renderCell
+    ? (col: ColumnDef, value: unknown) => renderCell(col, value, {} as RowData)
+    : (col: ColumnDef, value: unknown) => defaultRenderCell(col, value)
 
   /* -----------------------------------------------------------------------
    * Render a single data row
@@ -125,7 +126,6 @@ export function Content({
   ): React.ReactNode {
     const path = parentPath ? `${parentPath}/${section.key}` : section.key
     const collapsed = groupBy.isCollapsed(path)
-    const sumAmount = sumField ? section.sums[sumField] : undefined
 
     return (
       <Fragment key={path}>
@@ -134,11 +134,11 @@ export function Content({
           fieldLabel={section.fieldLabel}
           level={section.level}
           count={section.count}
-          sumAmount={sumAmount}
-          sumLabel={sumLabel}
+          columns={visibleColumns}
+          sums={section.sums}
           isCollapsed={collapsed}
           onToggle={() => groupBy.toggleCollapse(path)}
-          colSpan={colSpan}
+          renderCell={renderAggregateCell}
         />
 
         {!collapsed && (
@@ -209,7 +209,6 @@ export function Content({
         groupedData.map((section) => {
           const path = section.key
           const collapsed = groupBy.isCollapsed(path)
-          const sumAmount = sumField ? section.sums[sumField] : undefined
 
           return (
             <TableBody key={path}>
@@ -218,11 +217,10 @@ export function Content({
                 fieldLabel={section.fieldLabel}
                 level={section.level}
                 count={section.count}
-                sumAmount={sumAmount}
-                sumLabel={sumLabel}
+                columns={visibleColumns}
+                sums={section.sums}
                 isCollapsed={collapsed}
                 onToggle={() => groupBy.toggleCollapse(path)}
-                colSpan={colSpan}
               />
 
               {!collapsed && (
