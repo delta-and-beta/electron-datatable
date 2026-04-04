@@ -9,16 +9,17 @@ export function searchRecords<T extends RowData>(
   const trimmed = query.trim().toLowerCase()
   if (!trimmed) return records
 
-  const searchableFields = columns
-    .filter((col) => col.searchable !== false && (col.type === 'text' || col.type === 'custom'))
+  // Columns that explicitly opt in, OR are text/custom and don't opt out
+  const fields = columns
+    .filter((col) => {
+      if (col.searchable === true) return true
+      if (col.searchable === false) return false
+      return col.type === 'text' || col.type === 'custom'
+    })
     .map((col) => col.id)
 
-  // Also include all columns that don't explicitly opt out
-  const allSearchableFields = columns
-    .filter((col) => col.searchable !== false)
-    .map((col) => col.id)
-
-  const fields = searchableFields.length > 0 ? allSearchableFields : columns.map((c) => c.id)
+  // No searchable columns → search is disabled, return all records
+  if (fields.length === 0) return records
 
   return records.filter((record) =>
     fields.some((field) => {
