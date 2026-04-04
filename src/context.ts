@@ -36,6 +36,7 @@ export interface DataTableContextValue<T extends RowData = RowData> {
   // Attachments
   attachmentAdapter: AttachmentAdapter | null
   attachmentCounts: Record<string, number>
+  refreshAttachmentCounts: () => void
 
   // Config
   rowKey: string

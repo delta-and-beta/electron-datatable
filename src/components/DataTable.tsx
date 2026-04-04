@@ -1,6 +1,6 @@
 // Compound component root — wires together all hooks and provides context
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { RowData, DataTableProps } from '../types'
 import { DataTableProvider, useDataTable, type DataTableContextValue } from '../context'
 import { useGroupBy } from '../hooks/useGroupBy'
@@ -21,6 +21,7 @@ import { FilterConfigPanel } from './toolbar/FilterConfigPanel'
 import { GroupHeader } from './headers/GroupHeader'
 import { DataTableErrorBoundary } from './ErrorBoundary'
 import { devWarn } from '../lib/dev-warn'
+import { cn } from '../lib/utils'
 
 function DataTableRoot<T extends RowData = RowData>({
   data,
@@ -74,7 +75,19 @@ function DataTableRoot<T extends RowData = RowData>({
   } | null>(null)
 
   // Attachment counts
-  const [attachmentCounts] = useState<Record<string, number>>({})
+  const [attachmentCounts, setAttachmentCounts] = useState<Record<string, number>>({})
+
+  const refreshAttachmentCounts = useCallback(() => {
+    if (!attachmentAdapter) return
+    const ids = data.map((row) => String(row[rowKey]))
+    if (ids.length === 0) return
+    attachmentAdapter.getCounts(ids).then(setAttachmentCounts).catch(() => {})
+  }, [attachmentAdapter, data, rowKey])
+
+  // Load attachment counts on mount and when data changes
+  useEffect(() => {
+    refreshAttachmentCounts()
+  }, [refreshAttachmentCounts])
 
   // Build context value
   const contextValue = useMemo<DataTableContextValue<T>>(
@@ -94,6 +107,7 @@ function DataTableRoot<T extends RowData = RowData>({
       setDateFilter,
       attachmentAdapter: attachmentAdapter ?? null,
       attachmentCounts,
+      refreshAttachmentCounts,
       rowKey: rowKey as string,
       storageKey,
     }),
@@ -112,6 +126,7 @@ function DataTableRoot<T extends RowData = RowData>({
       dateFilter,
       attachmentAdapter,
       attachmentCounts,
+      refreshAttachmentCounts,
       rowKey,
       storageKey,
     ],
@@ -137,7 +152,7 @@ function DataTableRoot<T extends RowData = RowData>({
     return (
       <DataTableErrorBoundary>
         <DataTableProvider value={contextValue as DataTableContextValue}>
-          <div className={className}>
+          <div className={cn('relative', className)}>
             <FullPreset onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
           </div>
         </DataTableProvider>
@@ -150,7 +165,7 @@ function DataTableRoot<T extends RowData = RowData>({
     return (
       <DataTableErrorBoundary>
         <DataTableProvider value={contextValue as DataTableContextValue}>
-          <div className={className}>
+          <div className={cn('relative', className)}>
             <Content onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
             <Footer />
           </div>
@@ -162,7 +177,7 @@ function DataTableRoot<T extends RowData = RowData>({
   return (
     <DataTableErrorBoundary>
       <DataTableProvider value={contextValue as DataTableContextValue}>
-        <div className={className}>{children}</div>
+        <div className={cn('relative', className)}>{children}</div>
       </DataTableProvider>
     </DataTableErrorBoundary>
   )

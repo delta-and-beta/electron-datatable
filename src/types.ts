@@ -96,7 +96,7 @@ export interface FilterConfig {
 
 /** Attachment adapter — consumers implement for their storage backend */
 export interface AttachmentAdapter {
-  add(rowId: string, file: File): Promise<Attachment>
+  add(rowId: string, filename: string, mimeType: string, dataBase64: string): Promise<Attachment>
   list(rowId: string): Promise<Attachment[]>
   delete(attachmentId: string): Promise<void>
   getCounts(rowIds: string[]): Promise<Record<string, number>>
