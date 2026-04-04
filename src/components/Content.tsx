@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Paperclip } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { formatDate, formatNumber, formatCurrency } from '../lib/format'
 import { useDataTable } from '../context'
@@ -65,14 +65,16 @@ export function Content({
   renderCell,
   onRowClick,
 }: ContentProps) {
-  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey } = useDataTable()
+  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey, attachmentAdapter, attachmentCounts } = useDataTable()
 
   // Resolve visible columns in display order
   const visibleColumns = columnState.visibleColumns
     .map((id) => columns.find((c) => c.id === id))
     .filter((c): c is ColumnDef => c !== undefined)
 
-  const colSpan = Math.max(visibleColumns.length, 1)
+  const hasAttachments = attachmentAdapter !== null
+  const extraColSpan = hasAttachments ? 1 : 0
+  const colSpan = Math.max(visibleColumns.length, 1) + extraColSpan
   const isGrouped = groupBy.isGrouped
   const isEmpty = sortedData.length === 0
 
@@ -111,6 +113,18 @@ export function Content({
             : undefined
         }
       >
+        {hasAttachments && (
+          <TableCell key="__attachments" className="text-center" style={{ width: '50px' }}>
+            {(attachmentCounts[String(row[rowKey])] ?? 0) > 0 ? (
+              <span className="flex items-center justify-center gap-0.5 text-dt-primary">
+                <Paperclip className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">{attachmentCounts[String(row[rowKey])]}</span>
+              </span>
+            ) : (
+              <Paperclip className="w-3.5 h-3.5 mx-auto text-dt-muted opacity-20" />
+            )}
+          </TableCell>
+        )}
         {visibleColumns.map((col) => {
           const value = row[col.id]
           const align = getAlign(col)
@@ -158,6 +172,7 @@ export function Content({
           isCollapsed={collapsed}
           onToggle={() => groupBy.toggleCollapse(path)}
           renderCell={renderAggregateCell}
+          extraColSpan={extraColSpan}
         />
 
         {!collapsed && (
@@ -194,6 +209,11 @@ export function Content({
     <Table className={className}>
       <TableHeader className={cn(stickyHeader && 'sticky top-0 z-20 bg-dt-bg')}>
         <TableRow>
+          {hasAttachments && (
+            <TableHead scope="col" className="text-center" style={{ width: '50px' }}>
+              <Paperclip className="w-3.5 h-3.5 mx-auto text-dt-muted" />
+            </TableHead>
+          )}
           {visibleColumns.map((col) => {
             const align = getAlign(col)
             const isSortable = col.sortable !== false
@@ -259,6 +279,7 @@ export function Content({
                 sums={section.sums}
                 isCollapsed={collapsed}
                 onToggle={() => groupBy.toggleCollapse(path)}
+                extraColSpan={extraColSpan}
               />
 
               {!collapsed && (

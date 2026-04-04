@@ -29,6 +29,8 @@ export interface GroupHeaderProps {
   stickyOffset?: number
   /** Optional cell renderer matching Content's renderCell pipeline */
   renderCell?: (column: ColumnDef, value: unknown) => React.ReactNode
+  /** Extra columns prepended before user columns (e.g., attachment column) */
+  extraColSpan?: number
 }
 
 /* ---------------------------------------------------------------------------
@@ -79,6 +81,7 @@ export function GroupHeader({
   onToggle,
   stickyOffset = 39,
   renderCell,
+  extraColSpan = 0,
 }: GroupHeaderProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLTableRowElement>(null)
@@ -178,7 +181,7 @@ export function GroupHeader({
         aria-hidden="true"
         style={{ height: 0, padding: 0, border: 'none' }}
       >
-        <td colSpan={columns.length} style={{ height: 0, padding: 0, border: 'none' }}>
+        <td colSpan={columns.length + extraColSpan} style={{ height: 0, padding: 0, border: 'none' }}>
           <div ref={sentinelRef} data-group-sentinel="" style={{ height: 0 }} />
         </td>
       </tr>
@@ -202,6 +205,13 @@ export function GroupHeader({
           }
         }}
       >
+        {extraColSpan > 0 && (
+          <td
+            key="__extra"
+            className={cn('sticky py-1.5 transition-colors duration-150', bgClass)}
+            style={{ top: stickyOffset, width: '50px' }}
+          />
+        )}
         {columns.map((col, idx) => {
           const isFirst = idx === 0
 
