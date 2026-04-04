@@ -63,6 +63,7 @@ function DataTableRoot<T extends RowData = RowData>({
     columns,
     sumFields,
     storageKey,
+    defaultLevels: defaultGroupBy,
   })
 
   // Date filter

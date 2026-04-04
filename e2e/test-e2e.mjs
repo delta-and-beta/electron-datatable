@@ -80,8 +80,10 @@ try {
   await Runtime.enable()
   await DOM.enable()
 
-  // Wait for the page to fully load and React to render
-  await sleep(3000)
+  // Clear localStorage from previous runs so defaultGroupBy takes effect
+  await Runtime.evaluate({ expression: 'localStorage.clear()' })
+  await Runtime.evaluate({ expression: 'location.reload()' })
+  await sleep(4000)
 
   // ── Test 1: Screenshot — Initial Load ──
 

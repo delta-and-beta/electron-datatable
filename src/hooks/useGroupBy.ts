@@ -9,6 +9,7 @@ interface UseGroupByOptions<T extends RowData> {
   columns: ColumnDef<T>[]
   sumFields?: string[]
   storageKey?: string
+  defaultLevels?: GroupLevel[]
 }
 
 export function useGroupBy<T extends RowData>({
@@ -16,27 +17,29 @@ export function useGroupBy<T extends RowData>({
   columns,
   sumFields = [],
   storageKey,
+  defaultLevels = [],
 }: UseGroupByOptions<T>) {
   const fullKey = storageKey ? `${storageKey}-groupby` : null
 
-  // Load initial state from localStorage
+  // Load initial state from localStorage, falling back to defaultLevels
   const [levels, setLevels] = useState<GroupLevel[]>(() => {
-    if (!fullKey) return []
-    try {
-      const saved = localStorage.getItem(fullKey)
-      if (saved) {
-        const config = JSON.parse(saved)
-        if (config && Array.isArray(config.groups)) {
-          const validFields = new Set(columns.filter((c) => c.groupable !== false).map((c) => c.id))
-          return config.groups.filter(
-            (g: unknown) => g && typeof g === 'object' && 'field' in g && typeof (g as GroupLevel).field === 'string' && validFields.has((g as GroupLevel).field)
-          )
+    if (fullKey) {
+      try {
+        const saved = localStorage.getItem(fullKey)
+        if (saved) {
+          const config = JSON.parse(saved)
+          if (config && Array.isArray(config.groups)) {
+            const validFields = new Set(columns.filter((c) => c.groupable !== false).map((c) => c.id))
+            return config.groups.filter(
+              (g: unknown) => g && typeof g === 'object' && 'field' in g && typeof (g as GroupLevel).field === 'string' && validFields.has((g as GroupLevel).field)
+            )
+          }
         }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
-    return []
+    return defaultLevels
   })
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
