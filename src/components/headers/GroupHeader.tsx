@@ -54,6 +54,11 @@ function isAggregatable(col: ColumnDef): boolean {
   return (col.type === 'currency' || col.type === 'number') && col.sumInGroup !== false
 }
 
+/** Resolve effective text alignment — currency/number default to right */
+function getAlign(col: ColumnDef): 'left' | 'center' | 'right' {
+  return col.align ?? ((col.type === 'currency' || col.type === 'number') ? 'right' : 'left')
+}
+
 /* ---------------------------------------------------------------------------
  * GroupHeader
  *
@@ -161,7 +166,9 @@ export function GroupHeader({
 
   const paddingLeft = 16 + level * 24
 
-  const bgClass = isStuck ? 'bg-dt-bg/80' : 'bg-dt-bg-secondary'
+  const bgClass = isStuck
+    ? 'bg-[color-mix(in_srgb,var(--dt-bg,#1a1a2e)_90%,transparent)]'
+    : 'bg-dt-bg-secondary'
 
   return (
     <>
@@ -232,6 +239,8 @@ export function GroupHeader({
             )
           }
 
+          const align = getAlign(col)
+
           if (isAggregatable(col) && sums[col.id] !== undefined) {
             // Aggregatable cell: show formatted sum with positive/negative color
             const value = sums[col.id]
@@ -241,8 +250,8 @@ export function GroupHeader({
                 className={cn(
                   'sticky px-4 py-1.5 tabular-nums transition-colors duration-150',
                   bgClass,
-                  col.align === 'right' && 'text-right',
-                  col.align === 'center' && 'text-center',
+                  align === 'right' && 'text-right',
+                  align === 'center' && 'text-center',
                   value < 0 ? 'text-dt-negative' : 'text-dt-positive',
                 )}
                 style={{
@@ -263,7 +272,12 @@ export function GroupHeader({
           return (
             <td
               key={col.id}
-              className={cn('sticky px-4 py-1.5 transition-colors duration-150', bgClass)}
+              className={cn(
+                'sticky px-4 py-1.5 transition-colors duration-150',
+                bgClass,
+                align === 'right' && 'text-right',
+                align === 'center' && 'text-center',
+              )}
               style={{
                 top: stickyOffset,
                 width: col.width,

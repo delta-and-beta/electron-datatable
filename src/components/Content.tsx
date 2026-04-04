@@ -7,6 +7,11 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { GroupHeader } from './headers'
 import type { RowData, ColumnDef, GroupedSection } from '../types'
 
+/** Resolve effective text alignment — currency/number default to right */
+function getAlign(col: ColumnDef): 'left' | 'center' | 'right' {
+  return col.align ?? ((col.type === 'currency' || col.type === 'number') ? 'right' : 'left')
+}
+
 /* ---------------------------------------------------------------------------
  * Props
  * --------------------------------------------------------------------------- */
@@ -95,12 +100,13 @@ export function Content({
       >
         {visibleColumns.map((col) => {
           const value = row[col.id]
+          const align = getAlign(col)
           return (
             <TableCell
               key={col.id}
               className={cn(
-                col.align === 'right' && 'text-right',
-                col.align === 'center' && 'text-center',
+                align === 'right' && 'text-right',
+                align === 'center' && 'text-center',
               )}
               style={col.width ? { width: col.width } : undefined}
             >
@@ -175,13 +181,15 @@ export function Content({
     <Table className={className}>
       <TableHeader className={cn(stickyHeader && 'sticky top-0 z-20 bg-dt-bg')}>
         <TableRow>
-          {visibleColumns.map((col) => (
+          {visibleColumns.map((col) => {
+            const align = getAlign(col)
+            return (
             <TableHead
               key={col.id}
               className={cn(
                 col.sortable !== false && 'cursor-pointer select-none',
-                col.align === 'right' && 'text-right',
-                col.align === 'center' && 'text-center',
+                align === 'right' && 'text-right',
+                align === 'center' && 'text-center',
               )}
               style={col.width ? { width: col.width } : undefined}
               onClick={
@@ -193,7 +201,8 @@ export function Content({
               {col.headerRender ? col.headerRender() : col.label}
               {col.sortable !== false && renderSortIcon(col.id)}
             </TableHead>
-          ))}
+            )
+          })}
         </TableRow>
       </TableHeader>
 

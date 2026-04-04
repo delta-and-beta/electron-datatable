@@ -104,7 +104,7 @@ export function GroupByConfigPanel({
       <div className="fixed inset-0 z-40" onClick={onClose} />
 
       {/* Panel */}
-      <div ref={panelRef} className={cn("absolute top-full z-50 mt-1 w-[420px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl", alignRight ? 'right-0' : 'left-0')}>
+      <div ref={panelRef} className={cn("absolute top-full z-50 mt-1 w-[520px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl", alignRight ? 'right-0' : 'left-0')}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
           <span className="text-sm font-medium text-gray-200">Group by</span>
@@ -176,7 +176,7 @@ export function GroupByConfigPanel({
                     <select
                       value={level.datePeriod ?? 'month'}
                       onChange={(e) => onUpdateGroup(index, { datePeriod: e.target.value as DatePeriod })}
-                      className="w-[90px] h-7 px-2 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-blue-500"
+                      className="w-[120px] h-7 px-2 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-blue-500"
                     >
                       {DATE_PERIODS.map((p) => (
                         <option key={p.value} value={p.value}>
@@ -190,7 +190,7 @@ export function GroupByConfigPanel({
                   <select
                     value={level.sort}
                     onChange={(e) => onUpdateGroup(index, { sort: e.target.value as 'asc' | 'desc' })}
-                    className="w-[110px] h-7 px-2 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-blue-500"
+                    className="w-[130px] h-7 px-2 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-blue-500"
                   >
                     <option value="asc">{sortLabels.asc}</option>
                     <option value="desc">{sortLabels.desc}</option>

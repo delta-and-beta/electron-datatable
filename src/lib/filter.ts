@@ -53,13 +53,19 @@ function evaluateCondition(record: RowData, condition: FilterCondition, columns:
   // Skip incomplete conditions (no value entered yet) — treat as "not configured"
   if (condition.value === '') return true
 
-  const colType = column.type
+  const colType = column.type ?? 'text'
 
-  if (colType === 'text' || colType === 'custom') return evaluateTextCondition(rawValue, condition)
-  if (colType === 'number' || colType === 'currency') return evaluateNumberCondition(rawValue, condition)
-  if (colType === 'date') return evaluateDateCondition(rawValue, condition)
-
-  return true
+  switch (colType) {
+    case 'number':
+    case 'currency':
+      return evaluateNumberCondition(rawValue, condition)
+    case 'date':
+      return evaluateDateCondition(rawValue, condition)
+    case 'text':
+    case 'custom':
+    default:
+      return evaluateTextCondition(rawValue, condition)
+  }
 }
 
 function evaluateTextCondition(rawValue: unknown, condition: FilterCondition): boolean {
@@ -71,7 +77,7 @@ function evaluateTextCondition(rawValue: unknown, condition: FilterCondition): b
     case 'is_not': return recordStr !== filterVal
     case 'contains': return recordStr.toLowerCase().includes(filterVal.toLowerCase())
     case 'does_not_contain': return !recordStr.toLowerCase().includes(filterVal.toLowerCase())
-    default: return true
+    default: return false
   }
 }
 
@@ -88,7 +94,7 @@ function evaluateNumberCondition(rawValue: unknown, condition: FilterCondition):
     case 'lt': return num < filterNum
     case 'gte': return num >= filterNum
     case 'lte': return num <= filterNum
-    default: return true
+    default: return false
   }
 }
 
@@ -100,11 +106,22 @@ function toLocalDateStr(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+function toDate(value: unknown): Date | null {
+  if (value instanceof Date) return value
+  if (typeof value === 'number') return new Date(value)
+  if (typeof value === 'string') {
+    const d = new Date(value)
+    return isNaN(d.getTime()) ? null : d
+  }
+  return null
+}
+
 function evaluateDateCondition(rawValue: unknown, condition: FilterCondition): boolean {
   if (isEmpty(rawValue)) return false
-  const recordDate = new Date(rawValue as string)
-  const filterDate = new Date(condition.value)
-  if (isNaN(recordDate.getTime()) || isNaN(filterDate.getTime())) return false
+
+  const recordDate = toDate(rawValue)
+  const filterDate = toDate(condition.value)
+  if (!recordDate || !filterDate) return false
 
   const rd = toLocalDateStr(recordDate)
   const fd = toLocalDateStr(filterDate)
@@ -115,7 +132,7 @@ function evaluateDateCondition(rawValue: unknown, condition: FilterCondition): b
     case 'is_after': return rd > fd
     case 'is_on_or_before': return rd <= fd
     case 'is_on_or_after': return rd >= fd
-    default: return true
+    default: return evaluateTextCondition(String(rawValue), condition)
   }
 }
 

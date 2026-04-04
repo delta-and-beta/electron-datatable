@@ -18,6 +18,9 @@ export type {
   FilterConfig,
 } from './types'
 
+// Config helpers
+export { defineTable, defineColumns } from './defineTable'
+
 // Pure logic (framework-agnostic)
 export { groupRecords, getGroupKey, getDatePeriodKey, sortGroups } from './lib/group-by'
 export { filterRecords, getOperatorsForColumnType, createEmptyCondition, createEmptyGroup, getFilterDepth, countConditions } from './lib/filter'

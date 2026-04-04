@@ -1,0 +1,11 @@
+:root {
+  --dt-primary: #3b82f6;
+  --dt-primary-hover: #2563eb;
+  --dt-bg: #ffffff;
+  --dt-bg-secondary: #f9fafb;
+  --dt-border: #e5e7eb;
+  --dt-text: #111827;
+  --dt-muted: #6b7280;
+  --dt-positive: #16a34a;
+  --dt-negative: #dc2626;
+}
