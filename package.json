@@ -17,6 +17,11 @@
       "import": "./dist/tailwind.js",
       "require": "./dist/tailwind.cjs"
     },
+    "./matching": {
+      "types": "./dist/matching.d.ts",
+      "import": "./dist/matching.js",
+      "require": "./dist/matching.cjs"
+    },
     "./styles.css": "./dist/styles.css",
     "./themes/dark.css": "./dist/themes/dark.css",
     "./themes/light.css": "./dist/themes/light.css"

@@ -16,4 +16,12 @@ export default defineConfig([
     dts: true,
     external: ['tailwindcss'],
   },
+  {
+    entry: ['src/matching.ts'],
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom', 'tailwindcss'],
+    treeshake: true,
+  },
 ])
