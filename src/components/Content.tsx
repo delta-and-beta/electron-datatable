@@ -72,7 +72,7 @@ export function Content({
     .map((id) => columns.find((c) => c.id === id))
     .filter((c): c is ColumnDef => c !== undefined)
 
-  const colSpan = visibleColumns.length
+  const colSpan = Math.max(visibleColumns.length, 1)
   const isGrouped = groupBy.isGrouped
   const isEmpty = sortedData.length === 0
 
@@ -86,7 +86,7 @@ export function Content({
    * ----------------------------------------------------------------------- */
 
   function renderRow(row: RowData, index: number) {
-    const key = row[rowKey] != null ? String(row[rowKey]) : index
+    const key = row[rowKey] != null ? String(row[rowKey]) : `row-${index}`
 
     return (
       <TableRow
