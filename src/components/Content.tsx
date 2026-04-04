@@ -183,24 +183,40 @@ export function Content({
         <TableRow>
           {visibleColumns.map((col) => {
             const align = getAlign(col)
+            const isSortable = col.sortable !== false
+
+            const ariaSortValue = !isSortable
+              ? undefined
+              : sort.sortField !== col.id
+                ? 'none' as const
+                : sort.sortDirection === 'asc'
+                  ? 'ascending' as const
+                  : 'descending' as const
+
             return (
-            <TableHead
-              key={col.id}
-              className={cn(
-                col.sortable !== false && 'cursor-pointer select-none',
-                align === 'right' && 'text-right',
-                align === 'center' && 'text-center',
-              )}
-              style={col.width ? { width: col.width } : undefined}
-              onClick={
-                col.sortable !== false
-                  ? () => sort.setSort(col.id)
-                  : undefined
-              }
-            >
-              {col.headerRender ? col.headerRender() : col.label}
-              {col.sortable !== false && renderSortIcon(col.id)}
-            </TableHead>
+              <TableHead
+                key={col.id}
+                scope="col"
+                aria-sort={ariaSortValue}
+                className={cn(
+                  align === 'right' && 'text-right',
+                  align === 'center' && 'text-center',
+                )}
+                style={col.width ? { width: col.width } : undefined}
+              >
+                {isSortable ? (
+                  <button
+                    type="button"
+                    onClick={() => sort.setSort(col.id)}
+                    className="inline-flex items-center gap-0.5 cursor-pointer select-none bg-transparent border-none p-0 font-medium text-dt-muted hover:text-dt-text"
+                  >
+                    {col.headerRender ? col.headerRender() : col.label}
+                    {renderSortIcon(col.id)}
+                  </button>
+                ) : (
+                  col.headerRender ? col.headerRender() : col.label
+                )}
+              </TableHead>
             )
           })}
         </TableRow>
