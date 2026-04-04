@@ -21,16 +21,6 @@
       "dist/**/*",
       "!dist/app.js.map"
     ],
-    "extraResources": [
-      {
-        "from": "../dist",
-        "to": "datatable-lib",
-        "filter": [
-          "styles.css",
-          "themes/**/*"
-        ]
-      }
-    ],
     "mac": {
       "target": "dmg",
       "category": "public.app-category.developer-tools"
