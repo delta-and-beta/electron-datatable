@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { DataTable } from '../DataTable'
 import type { ColumnDef } from '../../types'
 
@@ -15,6 +15,11 @@ const data = [
 
 beforeEach(() => {
   localStorage.clear()
+  vi.useFakeTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('Search', () => {
@@ -22,6 +27,7 @@ describe('Search', () => {
     render(<DataTable columns={columns} data={data} rowKey="id" preset="full" />)
     const search = screen.getByPlaceholderText('Search...')
     fireEvent.change(search, { target: { value: 'Alice' } })
+    act(() => { vi.advanceTimersByTime(200) })
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.queryByText('Bob')).not.toBeInTheDocument()
   })
@@ -38,7 +44,9 @@ describe('Search', () => {
     render(<DataTable columns={columns} data={data} rowKey="id" preset="full" />)
     const search = screen.getByPlaceholderText('Search...')
     fireEvent.change(search, { target: { value: 'Alice' } })
+    act(() => { vi.advanceTimersByTime(200) })
     fireEvent.click(screen.getByLabelText('Clear search'))
+    act(() => { vi.advanceTimersByTime(200) })
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByText('Bob')).toBeInTheDocument()
   })

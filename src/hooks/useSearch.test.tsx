@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSearch } from './useSearch'
 import type { ColumnDef } from '../types'
@@ -13,6 +13,14 @@ const data = [
   { name: 'Bob', email: 'bob@test.com' },
 ]
 
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 describe('useSearch', () => {
   it('returns all data when query is empty', () => {
     const { result } = renderHook(() => useSearch({ data, columns }))
@@ -22,6 +30,7 @@ describe('useSearch', () => {
   it('filters data when query is set', () => {
     const { result } = renderHook(() => useSearch({ data, columns }))
     act(() => result.current.setQuery('alice'))
+    act(() => { vi.advanceTimersByTime(200) })
     expect(result.current.filteredData).toHaveLength(1)
     expect(result.current.filteredData[0].name).toBe('Alice')
   })
@@ -29,8 +38,10 @@ describe('useSearch', () => {
   it('clears search', () => {
     const { result } = renderHook(() => useSearch({ data, columns }))
     act(() => result.current.setQuery('alice'))
+    act(() => { vi.advanceTimersByTime(200) })
     expect(result.current.filteredData).toHaveLength(1)
     act(() => result.current.clearSearch())
+    act(() => { vi.advanceTimersByTime(200) })
     expect(result.current.filteredData).toEqual(data)
   })
 
