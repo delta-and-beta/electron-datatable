@@ -190,7 +190,17 @@ export function GroupHeader({
           'group/header sticky z-10 cursor-pointer',
         )}
         style={{ top: stickyOffset }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={!isCollapsed}
+        aria-label={`${fieldLabel}: ${groupKey}, ${count} records, ${isCollapsed ? 'collapsed' : 'expanded'}`}
         onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onToggle()
+          }
+        }}
       >
         {columns.map((col, idx) => {
           const isFirst = idx === 0

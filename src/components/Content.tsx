@@ -86,6 +86,7 @@ export function Content({
    * ----------------------------------------------------------------------- */
 
   function renderRow(row: RowData, index: number) {
+    const isClickable = !!onRowClick
     const key = row[rowKey] != null ? String(row[rowKey]) : `row-${index}`
 
     return (
@@ -93,10 +94,22 @@ export function Content({
         key={key}
         data-row-id={row[rowKey] != null ? String(row[rowKey]) : undefined}
         className={cn(
-          onRowClick && 'cursor-pointer',
+          isClickable && 'cursor-pointer',
           rowClassName?.(row),
         )}
-        onClick={onRowClick ? () => onRowClick(row) : undefined}
+        role={isClickable ? 'button' : undefined}
+        tabIndex={isClickable ? 0 : undefined}
+        onClick={isClickable ? () => onRowClick(row) : undefined}
+        onKeyDown={
+          isClickable
+            ? (e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onRowClick(row)
+                }
+              }
+            : undefined
+        }
       >
         {visibleColumns.map((col) => {
           const value = row[col.id]

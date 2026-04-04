@@ -38,10 +38,7 @@ function renderGroupHeader(overrides = {}) {
 describe('GroupHeader', () => {
   it('renders one td per column', () => {
     renderGroupHeader()
-    const rows = screen.getAllByRole('row')
-    const visibleRow = rows.find(
-      (r) => r.getAttribute('aria-hidden') !== 'true',
-    )!
+    const visibleRow = screen.getByRole('button', { name: /Food/ })
     const cells = visibleRow.querySelectorAll('td')
     expect(cells).toHaveLength(4)
   })
@@ -66,10 +63,7 @@ describe('GroupHeader', () => {
 
   it('leaves non-aggregatable cells empty', () => {
     renderGroupHeader()
-    const rows = screen.getAllByRole('row')
-    const visibleRow = rows.find(
-      (r) => r.getAttribute('aria-hidden') !== 'true',
-    )!
+    const visibleRow = screen.getByRole('button', { name: /Food/ })
     const cells = visibleRow.querySelectorAll('td')
     // Last cell (status, type=text) should be empty
     expect(cells[3].textContent).toBe('')
@@ -84,10 +78,7 @@ describe('GroupHeader', () => {
   it('calls onToggle when clicked', () => {
     const onToggle = vi.fn()
     renderGroupHeader({ onToggle })
-    const rows = screen.getAllByRole('row')
-    const visibleRow = rows.find(
-      (r) => r.getAttribute('aria-hidden') !== 'true',
-    )!
+    const visibleRow = screen.getByRole('button', { name: /Food/ })
     fireEvent.click(visibleRow)
     expect(onToggle).toHaveBeenCalledOnce()
   })
