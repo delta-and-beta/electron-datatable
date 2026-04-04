@@ -25,10 +25,13 @@ export function useGroupBy<T extends RowData>({
     try {
       const saved = localStorage.getItem(fullKey)
       if (saved) {
-        const config: GroupConfig = JSON.parse(saved)
-        // Validate saved fields still exist in columns
-        const validFields = new Set(columns.filter((c) => c.groupable !== false).map((c) => c.id))
-        return config.groups.filter((g) => validFields.has(g.field))
+        const config = JSON.parse(saved)
+        if (config && Array.isArray(config.groups)) {
+          const validFields = new Set(columns.filter((c) => c.groupable !== false).map((c) => c.id))
+          return config.groups.filter(
+            (g: unknown) => g && typeof g === 'object' && 'field' in g && typeof (g as GroupLevel).field === 'string' && validFields.has((g as GroupLevel).field)
+          )
+        }
       }
     } catch {
       // ignore
@@ -41,8 +44,10 @@ export function useGroupBy<T extends RowData>({
     try {
       const saved = localStorage.getItem(fullKey)
       if (saved) {
-        const config: GroupConfig = JSON.parse(saved)
-        return new Set(config.collapsed)
+        const config = JSON.parse(saved)
+        if (config && Array.isArray(config.collapsed)) {
+          return new Set(config.collapsed.filter((v: unknown) => typeof v === 'string'))
+        }
       }
     } catch {
       // ignore
@@ -55,8 +60,10 @@ export function useGroupBy<T extends RowData>({
     try {
       const saved = localStorage.getItem(fullKey)
       if (saved) {
-        const config: GroupConfig = JSON.parse(saved)
-        return config.showEmpty
+        const config = JSON.parse(saved)
+        if (config && typeof config.showEmpty === 'boolean') {
+          return config.showEmpty
+        }
       }
     } catch {
       // ignore

@@ -26,7 +26,16 @@ export function useSort<T extends RowData>({
     if (fullKey) {
       try {
         const saved = localStorage.getItem(fullKey)
-        if (saved) return JSON.parse(saved)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (
+            parsed &&
+            typeof parsed.field === 'string' &&
+            (parsed.direction === 'asc' || parsed.direction === 'desc')
+          ) {
+            return parsed as SortState
+          }
+        }
       } catch {
         // ignore
       }

@@ -56,9 +56,17 @@ export function useFilter<T extends RowData>({
     try {
       const saved = localStorage.getItem(fullKey)
       if (saved) {
-        const config: FilterConfig = JSON.parse(saved)
-        const validFields = new Set(columns.filter((c) => c.filterable !== false).map((c) => c.id))
-        return validateFilterGroup(config.root, validFields)
+        const config = JSON.parse(saved)
+        if (
+          config &&
+          config.root &&
+          typeof config.root.id === 'string' &&
+          Array.isArray(config.root.conditions) &&
+          Array.isArray(config.root.groups)
+        ) {
+          const validFields = new Set(columns.filter((c) => c.filterable !== false).map((c) => c.id))
+          return validateFilterGroup(config.root, validFields)
+        }
       }
     } catch {
       // ignore
@@ -71,8 +79,10 @@ export function useFilter<T extends RowData>({
     try {
       const saved = localStorage.getItem(fullKey)
       if (saved) {
-        const config: FilterConfig = JSON.parse(saved)
-        return config.enabled
+        const config = JSON.parse(saved)
+        if (config && typeof config.enabled === 'boolean') {
+          return config.enabled
+        }
       }
     } catch {
       // ignore

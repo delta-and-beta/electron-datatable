@@ -15,17 +15,21 @@ export function useColumns<T extends RowData>({ columns, storageKey }: UseColumn
   const fullKey = storageKey ? `${storageKey}-columns` : null
 
   const [state, setState] = useState<ColumnState>(() => {
-    // Try loading from localStorage
     if (fullKey) {
       try {
         const saved = localStorage.getItem(fullKey)
         if (saved) {
-          const parsed: ColumnState = JSON.parse(saved)
-          // Validate against current columns
-          const validIds = new Set(columns.map((c) => c.id))
-          return {
-            visible: parsed.visible.filter((id) => validIds.has(id)),
-            order: parsed.order.filter((id) => validIds.has(id)),
+          const parsed = JSON.parse(saved)
+          if (
+            parsed &&
+            Array.isArray(parsed.visible) &&
+            Array.isArray(parsed.order)
+          ) {
+            const validIds = new Set(columns.map((c) => c.id))
+            return {
+              visible: parsed.visible.filter((id: unknown) => typeof id === 'string' && validIds.has(id)),
+              order: parsed.order.filter((id: unknown) => typeof id === 'string' && validIds.has(id)),
+            }
           }
         }
       } catch {
@@ -33,7 +37,6 @@ export function useColumns<T extends RowData>({ columns, storageKey }: UseColumn
       }
     }
 
-    // Defaults from column defs
     return {
       visible: columns.filter((c) => c.visible !== false).map((c) => c.id),
       order: columns.map((c) => c.id),
