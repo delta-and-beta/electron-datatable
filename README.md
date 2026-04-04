@@ -30,6 +30,7 @@
 | **State persistence** | Sort, filter, grouping, and column state saved to `localStorage` |
 | **Compound components** | Use presets for zero-config, or compose your own layout |
 | **Theming** | `dt-*` design tokens via CSS custom properties, dark & light included |
+| **Bulk file matching** | Drop files → OCR → match → confirm → attach, with adapter pattern |
 | **Type-safe** | Generic `defineTable<T>()` with full IntelliSense on column IDs |
 | **Tree-shakeable** | Every hook and pure function importable independently |
 
@@ -324,10 +325,117 @@ Returns `{ columns, rowKey, storageKey, defaultSort, defaultGroupBy }` — sprea
 
 ```ts
 interface AttachmentAdapter {
-  add(rowId: string, file: File): Promise<Attachment>
+  add(rowId: string, filename: string, mimeType: string, dataBase64: string): Promise<Attachment>
   list(rowId: string): Promise<Attachment[]>
   delete(attachmentId: string): Promise<void>
   getCounts(rowIds: string[]): Promise<Record<string, number>>
+}
+```
+
+---
+
+## Bulk File Matching
+
+The `/matching` entry point adds OCR-based file matching as a composable layer on top of DataTable. Consumers provide a `MatchingAdapter` and the package handles the entire flow.
+
+### Install
+
+The matching module ships in the same package — just import from the `/matching` path:
+
+```tsx
+import { MatchingDataTable } from '@delta-and-beta/electron-datatable/matching'
+```
+
+### Zero-config usage
+
+```tsx
+import { defineTable } from '@delta-and-beta/electron-datatable'
+import { MatchingDataTable } from '@delta-and-beta/electron-datatable/matching'
+
+const matchingAdapter = {
+  ocr: (files) => myOcrService.process(files),
+  match: (ocrResults, transactions, onProgress) => myMatcher.match(ocrResults, transactions, onProgress),
+  summarize: (row) => ({
+    id: row.id,
+    date: row.date,
+    amount: row.amount,
+    currency: 'USD',
+    description: row.merchant,
+  }),
+}
+
+<MatchingDataTable
+  {...table}
+  data={data}
+  preset="full"
+  attachmentAdapter={attachmentAdapter}
+  matchingAdapter={matchingAdapter}
+/>
+```
+
+When users drop 2+ files onto the table, the matching flow runs automatically:
+1. Files are read and filtered by MIME type (PDF, PNG, JPEG, GIF by default)
+2. OCR is called via `matchingAdapter.ocr()`
+3. Results are matched against transactions via `matchingAdapter.match()`
+4. Duplicates are detected against existing attachments
+5. A report dialog shows matches (with confidence badges) and unmatched files
+6. User confirms, and files are attached via `attachmentAdapter.add()`
+
+Single-file drops go directly to `attachmentAdapter.add()` (no OCR/matching).
+
+### With shadcn Dialog
+
+```tsx
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+
+<MatchingDataTable
+  {...table}
+  data={data}
+  preset="full"
+  attachmentAdapter={attachmentAdapter}
+  matchingAdapter={matchingAdapter}
+  matchingDialogWrapper={({ open, onClose, children }) => (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden">
+        {children}
+      </DialogContent>
+    </Dialog>
+  )}
+/>
+```
+
+### Manual composition
+
+```tsx
+import { DataTable } from '@delta-and-beta/electron-datatable'
+import { useMatching, MatchingProvider, BulkDropZone, MatchingReportDialog } from '@delta-and-beta/electron-datatable/matching'
+
+function MyTable({ data }) {
+  const matching = useMatching({ matchingAdapter, attachmentAdapter, data })
+
+  return (
+    <MatchingProvider value={matching}>
+      <div className="relative" {...matching.dropHandlers}>
+        <DataTable {...table} data={data} preset="full" />
+        <BulkDropZone />
+        <MatchingReportDialog />
+      </div>
+    </MatchingProvider>
+  )
+}
+```
+
+### `MatchingAdapter<T>`
+
+```ts
+interface MatchingAdapter<T> {
+  ocr(files: Array<{ filename: string; mimeType: string; dataBase64: string }>): Promise<OcrResult[]>
+  match(
+    ocrResults: OcrResult[],
+    transactions: TransactionSummary[],
+    onProgress: (progress: MatchingProgress) => void,
+  ): Promise<MatchResult>
+  summarize(row: T): TransactionSummary
 }
 ```
 

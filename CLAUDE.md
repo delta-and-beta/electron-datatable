@@ -74,16 +74,30 @@ localStorage key patterns:
 
 `src/tailwind.ts` exports `dataTablePreset` — a Tailwind config partial defining `dt-*` color tokens backed by CSS custom properties (e.g., `--dt-primary`). Consumers override via CSS variables. This is a separate entry point: `@delta-and-beta/electron-datatable/tailwind`. Pre-built dark/light themes ship as CSS files in `dist/themes/`.
 
+### Bulk Matching Plugin (`src/matching.ts`)
+
+A separate entry point (`@delta-and-beta/electron-datatable/matching`) providing bulk file drop → OCR → match → confirm → attach orchestration. Core DataTable never imports from matching — one-way dependency.
+
+Key pieces:
+- `MatchingAdapter<T>` — consumer provides `ocr()`, `match()`, `summarize()` backends
+- `useMatching` hook — full state machine: `idle → reading → ocr → matching → duplicates → reviewing → attaching → done | error`
+- `MatchingProvider` / `useMatchingContext()` — separate React context (not in DataTable's context)
+- `MatchingDataTable` — drop-in wrapper composing DataTable + BulkDropZone + MatchingReportDialog
+- `matchingDialogWrapper` prop — lets consumers wrap dialog content in their own shell (e.g., shadcn `<Dialog>`)
+- Matching state is session-only (no localStorage persistence). `reset()` clears everything.
+- Single-file row drops go directly to `AttachmentAdapter.add()`. Bulk drops (2+ files) trigger the matching flow.
+
 ### Build Outputs
 
 The full `npm run build` chains three steps:
-1. **tsup** — two entry points (`src/index.ts` for components/hooks, `src/tailwind.ts` for the preset) → ESM + CJS + `.d.ts`
+1. **tsup** — three entry points (`src/index.ts` for components/hooks, `src/tailwind.ts` for the preset, `src/matching.ts` for bulk matching) → ESM + CJS + `.d.ts`
 2. **tailwindcss** — compiles `src/styles-input.css` (just `@tailwind utilities`) through `tailwind.build.config.ts` → `dist/styles.css`
 3. **Copy themes** — copies `src/themes/*.css` (dark/light token presets) into `dist/themes/`
 
-Three export paths in `package.json`:
+Four export paths in `package.json`:
 - `"."` → components, hooks, types
 - `"./tailwind"` → Tailwind preset only
+- `"./matching"` → matching types, hook, components, utilities
 - `"./styles.css"`, `"./themes/dark.css"`, `"./themes/light.css"` → CSS files
 
 ### Testing
