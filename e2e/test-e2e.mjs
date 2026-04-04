@@ -163,6 +163,54 @@ try {
   })
   report('Title "Bank Transactions" visible', titleResult.result.value === true)
 
+  // ── Test 9: Demo Bulk Match button present ──
+
+  const demoButtonResult = await Runtime.evaluate({
+    expression: `document.getElementById('demo-bulk-match') !== null`,
+    returnByValue: true,
+  })
+  report('Demo Bulk Match button present', demoButtonResult.result.value === true)
+
+  // ── Test 10: Trigger bulk matching and wait for dialog ──
+
+  // Set E2E mode for instant mock responses
+  await Runtime.evaluate({ expression: 'window.__E2E_MODE__ = true' })
+
+  // Click the demo button
+  await Runtime.evaluate({ expression: `document.getElementById('demo-bulk-match').click()` })
+  await sleep(2000) // Wait for async matching flow to complete
+
+  const dialogResult = await Runtime.evaluate({
+    expression: `document.querySelector('[role="dialog"]') !== null`,
+    returnByValue: true,
+  })
+  report('Matching dialog appeared after bulk match', dialogResult.result.value === true)
+
+  // ── Test 11: Dialog shows matched files ──
+
+  const matchedResult = await Runtime.evaluate({
+    expression: `document.body.innerText.includes('Matched files')`,
+    returnByValue: true,
+  })
+  report('Matching dialog shows matched files section', matchedResult.result.value === true)
+
+  // ── Test 12: Confidence badges visible ──
+
+  const badgeResult = await Runtime.evaluate({
+    expression: `
+      document.body.innerText.includes('High') ||
+      document.body.innerText.includes('Medium') ||
+      document.body.innerText.includes('Low')
+    `,
+    returnByValue: true,
+  })
+  report('Confidence badges visible in matching dialog', badgeResult.result.value === true)
+
+  // ── Screenshot 3: Matching dialog ──
+
+  await screenshot({ Page }, '03-matching-dialog.png')
+  report('Screenshot: matching dialog captured', true)
+
   await client.close()
 
 } catch (err) {
