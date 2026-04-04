@@ -1,6 +1,6 @@
 // Compound component root — wires together all hooks and provides context
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { RowData, DataTableProps } from '../types'
 import { DataTableProvider, useDataTable, type DataTableContextValue } from '../context'
 import { useGroupBy } from '../hooks/useGroupBy'
@@ -19,6 +19,8 @@ import { DateFilter } from './toolbar/DateFilter'
 import { FilterToolbarButton } from './toolbar/FilterToolbarButton'
 import { FilterConfigPanel } from './toolbar/FilterConfigPanel'
 import { GroupHeader } from './headers/GroupHeader'
+import { DataTableErrorBoundary } from './ErrorBoundary'
+import { devWarn } from '../lib/dev-warn'
 
 function DataTableRoot<T extends RowData = RowData>({
   data,
@@ -114,33 +116,54 @@ function DataTableRoot<T extends RowData = RowData>({
     ],
   )
 
+  // Dev-mode config validation
+  useEffect(() => {
+    devWarn(columns.length === 0, 'columns array is empty')
+    devWarn(
+      data.length > 0 && !(rowKey in data[0]),
+      `rowKey "${rowKey}" not found on data items`,
+    )
+    devWarn(storageKey === '', 'storageKey is empty string, localStorage persistence disabled')
+    devWarn(
+      !!defaultSort?.field && !columns.some((c) => c.id === defaultSort.field),
+      `defaultSort field "${defaultSort?.field}" not found in columns`,
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Preset: full — renders complete toolbar + content + footer
   if (preset === 'full' && !children) {
     return (
-      <DataTableProvider value={contextValue as DataTableContextValue}>
-        <div className={className}>
-          <FullPreset onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
-        </div>
-      </DataTableProvider>
+      <DataTableErrorBoundary>
+        <DataTableProvider value={contextValue as DataTableContextValue}>
+          <div className={className}>
+            <FullPreset onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
+          </div>
+        </DataTableProvider>
+      </DataTableErrorBoundary>
     )
   }
 
   // Preset: minimal — content + footer only, no toolbar
   if (preset === 'minimal' && !children) {
     return (
-      <DataTableProvider value={contextValue as DataTableContextValue}>
-        <div className={className}>
-          <Content onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
-          <Footer />
-        </div>
-      </DataTableProvider>
+      <DataTableErrorBoundary>
+        <DataTableProvider value={contextValue as DataTableContextValue}>
+          <div className={className}>
+            <Content onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
+            <Footer />
+          </div>
+        </DataTableProvider>
+      </DataTableErrorBoundary>
     )
   }
 
   return (
-    <DataTableProvider value={contextValue as DataTableContextValue}>
-      <div className={className}>{children}</div>
-    </DataTableProvider>
+    <DataTableErrorBoundary>
+      <DataTableProvider value={contextValue as DataTableContextValue}>
+        <div className={className}>{children}</div>
+      </DataTableProvider>
+    </DataTableErrorBoundary>
   )
 }
 
