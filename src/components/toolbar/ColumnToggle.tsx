@@ -99,7 +99,7 @@ export function ColumnToggle({ className }: ColumnToggleProps) {
           <div className="fixed inset-0 z-40" onClick={close} />
 
           {/* Dropdown */}
-          <div ref={panelRef} role="dialog" aria-label="Toggle column visibility" onKeyDown={handlePanelKeyDown} className="absolute top-full left-0 z-50 mt-1 w-[240px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl">
+          <div ref={panelRef} role="dialog" aria-label="Toggle column visibility" onKeyDown={handlePanelKeyDown} className="absolute top-full right-0 z-50 mt-1 w-[240px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl">
             {/* Header */}
             <div className="px-3 py-2 border-b border-gray-700">
               <span className="text-xs text-gray-400">Drag to reorder columns</span>

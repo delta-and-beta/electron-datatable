@@ -34,6 +34,7 @@ function DataTableRoot<T extends RowData = RowData>({
   defaultGroupBy,
   onRowClick,
   onRowContextMenu,
+  toolbarExtra,
   className,
   children,
 }: DataTableProps<T>) {
@@ -153,7 +154,7 @@ function DataTableRoot<T extends RowData = RowData>({
       <DataTableErrorBoundary>
         <DataTableProvider value={contextValue as DataTableContextValue}>
           <div className={cn('relative', className)}>
-            <FullPreset onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
+            <FullPreset onRowClick={onRowClick as ((row: RowData) => void) | undefined} toolbarExtra={toolbarExtra} />
           </div>
         </DataTableProvider>
       </DataTableErrorBoundary>
@@ -184,7 +185,7 @@ function DataTableRoot<T extends RowData = RowData>({
 }
 
 /** Full preset layout: toolbar + content + footer */
-function FullPreset({ onRowClick }: { onRowClick?: (row: RowData) => void }) {
+function FullPreset({ onRowClick, toolbarExtra }: { onRowClick?: (row: RowData) => void; toolbarExtra?: React.ReactNode }) {
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
 
@@ -195,6 +196,7 @@ function FullPreset({ onRowClick }: { onRowClick?: (row: RowData) => void }) {
         setGroupMenuOpen={setGroupMenuOpen}
         filterMenuOpen={filterMenuOpen}
         setFilterMenuOpen={setFilterMenuOpen}
+        toolbarExtra={toolbarExtra}
       />
       <div className="overflow-auto h-full">
         <Content stickyHeader onRowClick={onRowClick} />
@@ -209,11 +211,13 @@ function FullPresetToolbar({
   setGroupMenuOpen,
   filterMenuOpen,
   setFilterMenuOpen,
+  toolbarExtra,
 }: {
   groupMenuOpen: boolean
   setGroupMenuOpen: (open: boolean) => void
   filterMenuOpen: boolean
   setFilterMenuOpen: (open: boolean) => void
+  toolbarExtra?: React.ReactNode
 }) {
   const { groupBy, filter, columns } = useDataTable()
   const groupableColumns = columns.filter((c) => c.groupable !== false)
@@ -221,6 +225,7 @@ function FullPresetToolbar({
   return (
     <Toolbar>
       <Search className="w-80" />
+      {toolbarExtra}
       <div className="flex items-center gap-3">
         <div className="relative">
           <FilterToolbarButton
