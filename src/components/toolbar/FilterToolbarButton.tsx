@@ -24,6 +24,8 @@ export function FilterToolbarButton({
     <div className="inline-flex items-center gap-0.5">
       <button
         onClick={onClick}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
         className={cn(
           'inline-flex items-center gap-2 h-8 px-3 text-xs font-medium rounded-md border transition-colors',
           'border-gray-600 text-gray-300 hover:bg-gray-700',
