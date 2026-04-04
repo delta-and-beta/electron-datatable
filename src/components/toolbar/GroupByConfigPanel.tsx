@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { GripVertical, Trash2, Plus } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useDropdownAlign } from '../../hooks/useDropdownAlign'
@@ -53,6 +53,32 @@ export function GroupByConfigPanel({
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
 
+  useEffect(() => {
+    if (panelRef.current) {
+      const first = panelRef.current.querySelector<HTMLElement>('button, select, [tabindex]')
+      first?.focus()
+    }
+  }, [panelRef])
+
+  function handlePanelKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.stopPropagation()
+      onClose()
+    }
+  }
+
+  function handleMoveUp(index: number) {
+    if (index > 0) {
+      onReorderGroups(index, index - 1)
+    }
+  }
+
+  function handleMoveDown(index: number) {
+    if (index < levels.length - 1) {
+      onReorderGroups(index, index + 1)
+    }
+  }
+
   const usedFields = new Set(levels.map((l) => l.field))
   const availableFields = columns.filter((c) => c.groupable !== false && !usedFields.has(c.id))
   const canAddMore = levels.length < MAX_LEVELS && availableFields.length > 0
@@ -104,7 +130,7 @@ export function GroupByConfigPanel({
       <div className="fixed inset-0 z-40" onClick={onClose} />
 
       {/* Panel */}
-      <div ref={panelRef} className={cn("absolute top-full z-50 mt-1 w-[520px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl", alignRight ? 'right-0' : 'left-0')}>
+      <div ref={panelRef} role="dialog" aria-label="Group by configuration" onKeyDown={handlePanelKeyDown} className={cn("absolute top-full z-50 mt-1 w-[520px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl", alignRight ? 'right-0' : 'left-0')}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
           <span className="text-sm font-medium text-gray-200">Group by</span>
@@ -195,6 +221,18 @@ export function GroupByConfigPanel({
                     <option value="asc">{sortLabels.asc}</option>
                     <option value="desc">{sortLabels.desc}</option>
                   </select>
+
+                  {/* Move up/down buttons */}
+                  <button type="button" onClick={() => handleMoveUp(index)} disabled={index === 0}
+                    aria-label={`Move ${getColumnLabel(level.field)} up`}
+                    className="p-0.5 text-gray-500 hover:text-gray-300 disabled:opacity-25 disabled:cursor-default">
+                    <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2v8M3 5l3-3 3 3"/></svg>
+                  </button>
+                  <button type="button" onClick={() => handleMoveDown(index)} disabled={index === levels.length - 1}
+                    aria-label={`Move ${getColumnLabel(level.field)} down`}
+                    className="p-0.5 text-gray-500 hover:text-gray-300 disabled:opacity-25 disabled:cursor-default">
+                    <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 10V2M3 7l3 3 3-3"/></svg>
+                  </button>
 
                   {/* Delete button */}
                   <button
