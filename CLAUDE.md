@@ -16,7 +16,7 @@ npx vitest run src/lib/group-by.test.ts   # Run a single test file
 
 ## Package Overview
 
-`@delta-and-beta/data-table` — a publishable React component library for data tables with multi-level grouping, search, sorting, filtering, column management, and attachments. Styled with Tailwind CSS using custom `dt-*` design tokens (CSS custom properties).
+`@delta-and-beta/electron-datatable` — a publishable React component library for data tables with multi-level grouping, search, sorting, filtering, column management, and attachments. Styled with Tailwind CSS using custom `dt-*` design tokens (CSS custom properties).
 
 Peer dependencies: React 18+, Tailwind CSS 3+. Built with tsup, tested with vitest + @testing-library/react + jsdom.
 
@@ -62,7 +62,7 @@ Hooks (`useGroupBy`, `useColumns`, `useSort`, `useFilter`) persist their state t
 
 ### Tailwind Integration
 
-`src/tailwind.ts` exports `dataTablePreset` — a Tailwind config partial defining `dt-*` color tokens backed by CSS custom properties (e.g., `--dt-primary`). Consumers override via CSS variables. This is a separate entry point: `@delta-and-beta/data-table/tailwind`.
+`src/tailwind.ts` exports `dataTablePreset` — a Tailwind config partial defining `dt-*` color tokens backed by CSS custom properties (e.g., `--dt-primary`). Consumers override via CSS variables. This is a separate entry point: `@delta-and-beta/electron-datatable/tailwind`.
 
 ### Build Outputs
 

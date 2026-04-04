@@ -2,7 +2,7 @@ import { defineConfig } from 'electron-dev-bridge'
 
 export default defineConfig({
   app: {
-    name: 'data-table-e2e',
+    name: 'electron-datatable',
     path: __dirname,
   },
   cdpTools: true,

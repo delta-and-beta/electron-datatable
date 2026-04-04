@@ -1,5 +1,5 @@
 {
-  "name": "@delta-and-beta/data-table",
+  "name": "@delta-and-beta/electron-datatable",
   "version": "0.1.0",
   "description": "A feature-rich, composable React data table with multi-level grouping, attachments, search, and column management",
   "type": "module",
@@ -63,6 +63,7 @@
   "keywords": [
     "react",
     "table",
+    "electron-datatable",
     "data-table",
     "group-by",
     "grouping",
@@ -72,6 +73,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/delta-and-beta/data-table.git"
+    "url": "https://github.com/delta-and-beta/electron-datatable.git"
   }
 }

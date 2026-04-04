@@ -1,25 +1,59 @@
 {
-  "name": "data-table-e2e",
-  "version": "0.0.0",
+  "name": "electron-datatable",
+  "version": "0.1.0",
   "private": true,
   "main": "main.js",
   "scripts": {
     "generate": "tsx src/generate-data.ts",
     "bundle": "node esbuild.mjs",
     "start": "electron .",
-    "test": "node test-e2e.mjs"
+    "test": "node test-e2e.mjs",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.delta-and-beta.electron-datatable",
+    "productName": "Electron DataTable",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "dist/**/*",
+      "!dist/app.js.map"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist",
+        "to": "datatable-lib",
+        "filter": [
+          "styles.css",
+          "themes/**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   },
   "dependencies": {
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
   },
   "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "chrome-remote-interface": "^0.34.0",
     "electron": "^35.0.0",
+    "electron-builder": "^26.8.1",
     "electron-dev-bridge": "^0.4.0",
     "esbuild": "^0.24.0",
-    "chrome-remote-interface": "^0.34.0",
-    "tsx": "^4.21.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0"
+    "tsx": "^4.21.0"
   }
 }

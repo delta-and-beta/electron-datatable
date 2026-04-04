@@ -1,17 +1,17 @@
-# @delta-and-beta/data-table
+# @delta-and-beta/electron-datatable
 
 A composable React data table with multi-level grouping, search, sorting, filtering, and column management. Styled with Tailwind CSS, themed via CSS custom properties.
 
 ## Quick Start
 
 ```bash
-npm install @delta-and-beta/data-table
+npm install @delta-and-beta/electron-datatable
 ```
 
 ```tsx
-import '@delta-and-beta/data-table/styles.css'
-import '@delta-and-beta/data-table/themes/dark.css' // or bring your own tokens
-import { DataTable, defineTable } from '@delta-and-beta/data-table'
+import '@delta-and-beta/electron-datatable/styles.css'
+import '@delta-and-beta/electron-datatable/themes/dark.css' // or bring your own tokens
+import { DataTable, defineTable } from '@delta-and-beta/electron-datatable'
 
 const table = defineTable<Invoice>({
   rowKey: 'id',
@@ -30,7 +30,7 @@ const table = defineTable<Invoice>({
 ### 1. Install the package
 
 ```bash
-npm install @delta-and-beta/data-table
+npm install @delta-and-beta/electron-datatable
 ```
 
 Peer dependencies: `react >=18`, `react-dom >=18`, `tailwindcss >=3`.
@@ -40,7 +40,7 @@ Peer dependencies: `react >=18`, `react-dom >=18`, `tailwindcss >=3`.
 **If your app has an existing design system** (recommended):
 
 ```tsx
-import '@delta-and-beta/data-table/styles.css'
+import '@delta-and-beta/electron-datatable/styles.css'
 ```
 
 Then map your tokens to `dt-*` variables:
@@ -62,15 +62,15 @@ Then map your tokens to `dt-*` variables:
 **If you don't have a design system** (quick start):
 
 ```tsx
-import '@delta-and-beta/data-table/styles.css'
-import '@delta-and-beta/data-table/themes/dark.css'  // or themes/light.css
+import '@delta-and-beta/electron-datatable/styles.css'
+import '@delta-and-beta/electron-datatable/themes/dark.css'  // or themes/light.css
 ```
 
 **Alternative: Tailwind preset** (for teams that prefer native Tailwind integration):
 
 ```ts
 // tailwind.config.ts
-import { dataTablePreset } from '@delta-and-beta/data-table/tailwind'
+import { dataTablePreset } from '@delta-and-beta/electron-datatable/tailwind'
 
 export default {
   presets: [dataTablePreset],
@@ -85,7 +85,7 @@ export default {
 Column IDs are type-checked against your data shape. Returns props that spread directly onto `<DataTable>`.
 
 ```tsx
-import { defineTable } from '@delta-and-beta/data-table'
+import { defineTable } from '@delta-and-beta/electron-datatable'
 
 interface Invoice {
   id: string
@@ -119,7 +119,7 @@ function InvoicesPage({ data }: { data: Invoice[] }) {
 For simpler cases where you want an array but still want type safety:
 
 ```tsx
-import { defineColumns } from '@delta-and-beta/data-table'
+import { defineColumns } from '@delta-and-beta/electron-datatable'
 
 const columns = defineColumns<Invoice>([
   { id: 'vendor', label: 'Vendor', type: 'text' },
@@ -298,7 +298,7 @@ All colors are controlled via CSS custom properties. Override them to match your
 }
 ```
 
-Or import the preset: `import '@delta-and-beta/data-table/themes/light.css'`
+Or import the preset: `import '@delta-and-beta/electron-datatable/themes/light.css'`
 
 ### Scoped theming
 
@@ -346,7 +346,7 @@ When using `preset="none"`, compose your layout with these sub-components:
 Each hook is independently importable for building fully custom UIs:
 
 ```tsx
-import { useSearch, useSort, useGroupBy, useFilter, useColumns } from '@delta-and-beta/data-table'
+import { useSearch, useSort, useGroupBy, useFilter, useColumns } from '@delta-and-beta/electron-datatable'
 
 function CustomTable({ data, columns }) {
   const filter = useFilter({ data, columns, storageKey: 'my-table' })
@@ -364,7 +364,7 @@ function CustomTable({ data, columns }) {
 Access the full table state from any child component:
 
 ```tsx
-import { useDataTable } from '@delta-and-beta/data-table'
+import { useDataTable } from '@delta-and-beta/electron-datatable'
 
 function CustomFooter() {
   const { filteredData, groupBy } = useDataTable()
