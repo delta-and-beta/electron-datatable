@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.4] - 2026-05-31
+
+### Changed
+
+- Grouped **data rows** now indent their first column to nest under the group
+  header instead of sitting flush-left. The leading cell's `paddingLeft` aligns
+  with the deepest group header's label (`12 + (depth-1)×14 + 24` px, where 24 is
+  the chevron + gap that precede the label). Applied only while grouping is
+  active; ungrouped tables and non-leading columns are unchanged.
+
 ## [0.1.3] - 2026-05-31
 
 ### Added

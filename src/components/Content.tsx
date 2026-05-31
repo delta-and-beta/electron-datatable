@@ -78,6 +78,14 @@ export function Content({
   const isGrouped = groupBy.isGrouped
   const isEmpty = sortedData.length === 0
 
+  // When grouped, every data row is a leaf at the deepest level
+  // (groupBy.levels.length). Indent its first column so it nests under the group
+  // header instead of sitting flush-left: align with the deepest header's label,
+  // i.e. that header's paddingLeft (12 + level*14) plus the chevron + gap (24px)
+  // that precede the label inside GroupHeader's first cell.
+  const groupRowIndent =
+    groupBy.levels.length > 0 ? 12 + (groupBy.levels.length - 1) * 14 + 24 : undefined
+
   // Aggregate cell renderer — same pipeline as data cells but without a row
   const renderAggregateCell = renderCell
     ? (col: ColumnDef, value: unknown) => renderCell(col, value, {} as RowData)
@@ -128,6 +136,7 @@ export function Content({
         {visibleColumns.map((col) => {
           const value = row[col.id]
           const align = getAlign(col)
+          const isFirstCol = col.id === visibleColumns[0]?.id
           return (
             <TableCell
               key={col.id}
@@ -135,7 +144,12 @@ export function Content({
                 align === 'right' && 'text-right',
                 align === 'center' && 'text-center',
               )}
-              style={col.width ? { width: col.width } : undefined}
+              style={{
+                ...(col.width ? { width: col.width } : {}),
+                ...(isFirstCol && groupRowIndent !== undefined
+                  ? { paddingLeft: groupRowIndent }
+                  : {}),
+              }}
             >
               {renderCell
                 ? renderCell(col, value, row)
