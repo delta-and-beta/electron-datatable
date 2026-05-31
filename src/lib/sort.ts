@@ -28,3 +28,24 @@ export function sortRecords<T extends RowData>(
 ): T[] {
   return [...records].sort((a, b) => compareValues(a[field], b[field], direction))
 }
+
+/** A single sort instruction: field + direction. */
+export interface SortLevel {
+  field: string
+  direction: 'asc' | 'desc'
+}
+
+/**
+ * Sort by multiple fields in priority order — the first level breaks ties,
+ * then the second, and so on. Stable and side-effect free.
+ */
+export function sortRecordsMulti<T extends RowData>(records: T[], levels: SortLevel[]): T[] {
+  if (levels.length === 0) return records
+  return [...records].sort((a, b) => {
+    for (const lvl of levels) {
+      const cmp = compareValues(a[lvl.field], b[lvl.field], lvl.direction)
+      if (cmp !== 0) return cmp
+    }
+    return 0
+  })
+}

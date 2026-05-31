@@ -1,5 +1,8 @@
 export { GroupByToolbarButton } from './GroupByToolbarButton'
 export { GroupByConfigPanel } from './GroupByConfigPanel'
+export { SortToolbarButton } from './SortToolbarButton'
+export { SortConfigPanel } from './SortConfigPanel'
+export { SortControl } from './SortControl'
 export { Search } from './Search'
 export { ColumnToggle } from './ColumnToggle'
 export { DateFilter } from './DateFilter'

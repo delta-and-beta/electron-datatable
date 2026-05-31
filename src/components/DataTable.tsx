@@ -18,6 +18,7 @@ import { ColumnToggle } from './toolbar/ColumnToggle'
 import { DateFilter } from './toolbar/DateFilter'
 import { FilterToolbarButton } from './toolbar/FilterToolbarButton'
 import { FilterConfigPanel } from './toolbar/FilterConfigPanel'
+import { SortControl } from './toolbar/SortControl'
 import { GroupHeader } from './headers/GroupHeader'
 import { DataTableErrorBoundary } from './ErrorBoundary'
 import { devWarn } from '../lib/dev-warn'
@@ -219,7 +220,7 @@ function FullPresetToolbar({
   setFilterMenuOpen: (open: boolean) => void
   toolbarExtra?: React.ReactNode
 }) {
-  const { groupBy, filter, columns } = useDataTable()
+  const { groupBy, filter, columns, sort } = useDataTable()
   const groupableColumns = columns.filter((c) => c.groupable !== false)
 
   return (
@@ -274,6 +275,7 @@ function FullPresetToolbar({
             />
           )}
         </div>
+        <SortControl levels={sort.sortLevels} columns={columns} onChange={sort.setSortLevels} />
         <ColumnToggle />
       </div>
     </Toolbar>

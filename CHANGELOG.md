@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] - 2026-05-31
+
+### Added
+
+- Multi-field **Sort** toolbar control (button + popover panel) with parity to
+  Group by: add/remove/reorder up to 3 sort levels, per-field direction with
+  type-aware labels, "Clear all". Persisted to localStorage.
+- `useSort` is now multi-field (`sortLevels` / `setSortLevels`) while remaining
+  backward-compatible (`sortField` / `sortDirection` / `setSort` still reflect
+  and drive the primary level, so header-click sorting is unchanged). Legacy
+  single-object persisted values are migrated to one level.
+- `sortRecordsMulti(records, levels)` + `SortLevel` exported from the package.
+
 ## [0.1.2] - 2026-05-31
 
 ### Changed

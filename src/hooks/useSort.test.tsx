@@ -51,7 +51,7 @@ describe('useSort', () => {
     )
     act(() => result.current.setSort('name'))
     const saved = JSON.parse(localStorage.getItem('test-sort')!)
-    expect(saved).toEqual({ field: 'name', direction: 'asc' })
+    expect(saved).toEqual([{ field: 'name', direction: 'asc' }])
   })
 
   it('restores from localStorage', () => {
@@ -77,5 +77,37 @@ describe('useSort', () => {
       useSort({ data, defaultField: 'name', storageKey: 'test' }),
     )
     expect(result.current.sortField).toBe('name')
+  })
+
+  it('supports multi-field sort via setSortLevels (tiebreakers)', () => {
+    const rows = [
+      { team: 'B', score: 1 },
+      { team: 'A', score: 2 },
+      { team: 'A', score: 1 },
+      { team: 'B', score: 2 },
+    ]
+    const { result } = renderHook(() => useSort({ data: rows }))
+    act(() =>
+      result.current.setSortLevels([
+        { field: 'team', direction: 'asc' },
+        { field: 'score', direction: 'desc' },
+      ]),
+    )
+    expect(result.current.sortLevels).toHaveLength(2)
+    expect(result.current.sortedData).toEqual([
+      { team: 'A', score: 2 },
+      { team: 'A', score: 1 },
+      { team: 'B', score: 2 },
+      { team: 'B', score: 1 },
+    ])
+    // Backward-compatible primary view
+    expect(result.current.sortField).toBe('team')
+    expect(result.current.sortDirection).toBe('asc')
+  })
+
+  it('migrates a legacy single-object localStorage value into one level', () => {
+    localStorage.setItem('mig-sort', JSON.stringify({ field: 'age', direction: 'desc' }))
+    const { result } = renderHook(() => useSort({ data, storageKey: 'mig' }))
+    expect(result.current.sortLevels).toEqual([{ field: 'age', direction: 'desc' }])
   })
 })
