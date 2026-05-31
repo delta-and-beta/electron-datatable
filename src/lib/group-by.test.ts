@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { groupRecords, getGroupKey, getDatePeriodKey, sortGroups } from './group-by'
+import { resolveOrdinalOrder } from './ordinal-vocabularies'
 
 describe('getGroupKey', () => {
   it('returns string representation of value', () => {
@@ -44,6 +45,44 @@ describe('sortGroups', () => {
 
   it('sorts descending with (Empty) at end', () => {
     expect(sortGroups(['B', '(Empty)', 'A', 'C'], 'desc')).toEqual(['C', 'B', 'A', '(Empty)'])
+  })
+
+  it('orders a recognized vocabulary (High/Medium/Low) instead of alphabetically', () => {
+    expect(sortGroups(['Low', 'High', 'Medium'], 'asc')).toEqual(['High', 'Medium', 'Low'])
+  })
+
+  it('reverses an ordinal vocabulary on desc', () => {
+    expect(sortGroups(['Low', 'High', 'Medium'], 'desc')).toEqual(['Low', 'Medium', 'High'])
+  })
+
+  it('orders a subset of a vocabulary and keeps (Empty) last', () => {
+    expect(sortGroups(['Low', '(Empty)', 'High'], 'asc')).toEqual(['High', 'Low', '(Empty)'])
+  })
+
+  it('orders the sales funnel', () => {
+    expect(sortGroups(['Realized', 'Pipeline', 'Committed'], 'asc')).toEqual(['Pipeline', 'Committed', 'Realized'])
+  })
+
+  it('falls back to alphabetical for unrecognized values', () => {
+    expect(sortGroups(['Banana', 'Apple', 'Cherry'], 'asc')).toEqual(['Apple', 'Banana', 'Cherry'])
+  })
+})
+
+describe('resolveOrdinalOrder', () => {
+  it('returns canonical order when all keys belong to one vocabulary', () => {
+    expect(resolveOrdinalOrder(['Low', 'High', 'Medium'])).toEqual(['High', 'Medium', 'Low'])
+  })
+
+  it('is case- and whitespace-insensitive but preserves original strings', () => {
+    expect(resolveOrdinalOrder(['low ', 'HIGH'])).toEqual(['HIGH', 'low '])
+  })
+
+  it('returns null when keys are not all in a vocabulary', () => {
+    expect(resolveOrdinalOrder(['High', 'Banana'])).toBeNull()
+  })
+
+  it('returns null for fewer than two keys', () => {
+    expect(resolveOrdinalOrder(['High'])).toBeNull()
   })
 })
 

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-05-31
+
+### Added
+
+- Auto-detecting ordinal group ordering. Recognized vocabularies (High/Medium/Low,
+  sales-funnel stages, In-Progress/Complete, sizes, weekdays, months, …) now sort
+  group-by headers by their canonical sequence instead of alphabetically. Extend the
+  registry in `src/lib/ordinal-vocabularies.ts` — it is meant to grow over time.
+  Unrecognized value sets fall back to the previous numeric-aware alphabetical sort,
+  and `(Empty)` still sorts last. No API change.
+
 ## [0.1.0] - 2026-02-19
 
 ### Added

@@ -2,6 +2,7 @@
 // Extracted from hsbc-personal, made generic
 
 import type { RowData, GroupLevel, GroupedSection, DatePeriod } from '../types'
+import { resolveOrdinalOrder } from './ordinal-vocabularies'
 
 /** Minimal column info needed by the grouping algorithm */
 type GroupColumnInfo = { id: string; label: string }
@@ -37,14 +38,29 @@ export function getDatePeriodKey(dateStr: string, period: DatePeriod): string {
   }
 }
 
-/** Sort group keys with (Empty) pushed to end */
+/**
+ * Sort group keys with (Empty) pushed to end.
+ *
+ * Recognized ordinal vocabularies (High/Medium/Low, sales-funnel stages, …) are
+ * ordered by their canonical sequence instead of alphabetically; everything else
+ * falls back to a numeric-aware locale compare.
+ */
 export function sortGroups(keys: string[], direction: 'asc' | 'desc'): string[] {
-  return [...keys].sort((a, b) => {
-    if (a === '(Empty)') return 1
-    if (b === '(Empty)') return -1
-    const cmp = a.localeCompare(b, undefined, { numeric: true })
-    return direction === 'asc' ? cmp : -cmp
-  })
+  const hasEmpty = keys.includes('(Empty)')
+  const nonEmpty = keys.filter((k) => k !== '(Empty)')
+
+  const ordinal = resolveOrdinalOrder(nonEmpty)
+  const sorted = ordinal
+    ? direction === 'asc'
+      ? ordinal
+      : [...ordinal].reverse()
+    : [...nonEmpty].sort((a, b) => {
+        const cmp = a.localeCompare(b, undefined, { numeric: true })
+        return direction === 'asc' ? cmp : -cmp
+      })
+
+  if (hasEmpty) sorted.push('(Empty)')
+  return sorted
 }
 
 /** Recursively group records through multiple group levels */
