@@ -61,6 +61,19 @@ function getAlign(col: ColumnDef): 'left' | 'center' | 'right' {
   return col.align ?? ((col.type === 'currency' || col.type === 'number') ? 'right' : 'left')
 }
 
+/** Level-tinted group-header background — strongest at the top level, lighter when nested. */
+function groupBg(level: number, stuck: boolean): string {
+  const tint = level <= 0 ? 18 : level === 1 ? 11 : 6
+  const base = stuck ? 'var(--dt-bg, #14142a)' : 'var(--dt-bg-secondary, #1f2937)'
+  return `color-mix(in srgb, var(--dt-primary, #6366f1) ${tint}%, ${base})`
+}
+
+/** Left accent-bar colour for a group row — fades with depth. */
+function groupAccent(level: number): string {
+  const alpha = level <= 0 ? 90 : level === 1 ? 55 : 30
+  return `color-mix(in srgb, var(--dt-primary, #6366f1) ${alpha}%, transparent)`
+}
+
 /* ---------------------------------------------------------------------------
  * GroupHeader
  *
@@ -167,11 +180,11 @@ export function GroupHeader({
     }
   }, [stickyOffset])
 
-  const paddingLeft = 16 + level * 24
-
-  const bgClass = isStuck
-    ? 'bg-[color-mix(in_srgb,var(--dt-bg,#1a1a2e)_90%,transparent)]'
-    : 'bg-dt-bg-secondary'
+  // Reduced indentation, more vertical breathing room, and level-aware shading.
+  const paddingLeft = 12 + level * 14
+  const padY = level <= 0 ? 12 : 8
+  const bgColor = groupBg(level, isStuck)
+  const accentColor = groupAccent(level)
 
   return (
     <>
@@ -208,8 +221,8 @@ export function GroupHeader({
         {extraColSpan > 0 && (
           <td
             key="__extra"
-            className={cn('sticky py-1.5 transition-colors duration-150', bgClass)}
-            style={{ top: stickyOffset, width: '50px' }}
+            className={cn('sticky transition-colors duration-150')}
+            style={{ top: stickyOffset, width: '50px', backgroundColor: bgColor, paddingTop: padY, paddingBottom: padY }}
           />
         )}
         {columns.map((col, idx) => {
@@ -221,11 +234,15 @@ export function GroupHeader({
             return (
               <td
                 key={col.id}
-                className={cn('sticky py-1.5 pr-4 transition-colors duration-150', bgClass)}
+                className={cn('sticky pr-4 transition-colors duration-150')}
                 style={{
                   top: stickyOffset,
                   paddingLeft,
+                  paddingTop: padY,
+                  paddingBottom: padY,
                   width: col.width,
+                  backgroundColor: bgColor,
+                  boxShadow: `inset 3px 0 0 0 ${accentColor}`,
                 }}
               >
                 <div className="flex items-center gap-2">
@@ -268,8 +285,7 @@ export function GroupHeader({
               <td
                 key={col.id}
                 className={cn(
-                  'sticky px-4 py-1.5 tabular-nums transition-colors duration-150',
-                  bgClass,
+                  'sticky px-4 tabular-nums transition-colors duration-150',
                   align === 'right' && 'text-right',
                   align === 'center' && 'text-center',
                   value < 0 ? 'text-dt-negative' : 'text-dt-positive',
@@ -277,6 +293,9 @@ export function GroupHeader({
                 style={{
                   top: stickyOffset,
                   width: col.width,
+                  backgroundColor: bgColor,
+                  paddingTop: padY,
+                  paddingBottom: padY,
                 }}
               >
                 {renderCell
@@ -293,14 +312,16 @@ export function GroupHeader({
             <td
               key={col.id}
               className={cn(
-                'sticky px-4 py-1.5 transition-colors duration-150',
-                bgClass,
+                'sticky px-4 transition-colors duration-150',
                 align === 'right' && 'text-right',
                 align === 'center' && 'text-center',
               )}
               style={{
                 top: stickyOffset,
                 width: col.width,
+                backgroundColor: bgColor,
+                paddingTop: padY,
+                paddingBottom: padY,
               }}
             />
           )

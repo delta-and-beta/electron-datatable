@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-05-31
+
+### Changed
+
+- Group-header rows are now visually distinct: level-aware shaded background
+  (strongest at the top level, lighter when nested), a left accent bar, more
+  vertical padding, and reduced per-level indentation (12 + level×14 px, was
+  16 + level×24). All inline styles driven by the theme's `--dt-*` variables.
+
 ## [0.1.1] - 2026-05-31
 
 ### Added
