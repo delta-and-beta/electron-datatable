@@ -43,6 +43,14 @@ describe('useColumns', () => {
     expect(saved.visible).not.toContain('email')
   })
 
+  it('sets and persists column width', () => {
+    const { result } = renderHook(() => useColumns({ columns, storageKey: 'test' }))
+    act(() => result.current.setColumnWidth('name', 240))
+    expect(result.current.widths.name).toBe(240)
+    const saved = JSON.parse(localStorage.getItem('test-columns')!)
+    expect(saved.widths.name).toBe(240)
+  })
+
   it('restores from localStorage', () => {
     localStorage.setItem('test-columns', JSON.stringify({
       visible: ['name', 'age'],

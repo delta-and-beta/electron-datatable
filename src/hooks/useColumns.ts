@@ -9,6 +9,7 @@ interface UseColumnsOptions<T extends RowData> {
 interface ColumnState {
   visible: string[]
   order: string[]
+  widths: Record<string, number>
 }
 
 export function useColumns<T extends RowData>({ columns, storageKey }: UseColumnsOptions<T>) {
@@ -29,6 +30,7 @@ export function useColumns<T extends RowData>({ columns, storageKey }: UseColumn
             return {
               visible: parsed.visible.filter((id: unknown) => typeof id === 'string' && validIds.has(id)),
               order: parsed.order.filter((id: unknown) => typeof id === 'string' && validIds.has(id)),
+              widths: parsed.widths && typeof parsed.widths === 'object' ? parsed.widths : {},
             }
           }
         }
@@ -40,6 +42,7 @@ export function useColumns<T extends RowData>({ columns, storageKey }: UseColumn
     return {
       visible: columns.filter((c) => c.visible !== false).map((c) => c.id),
       order: columns.map((c) => c.id),
+      widths: {},
     }
   })
 
@@ -73,11 +76,17 @@ export function useColumns<T extends RowData>({ columns, storageKey }: UseColumn
 
   const isVisible = useCallback((id: string) => state.visible.includes(id), [state.visible])
 
+  const setColumnWidth = useCallback((id: string, width: number) => {
+    setState((prev) => ({ ...prev, widths: { ...prev.widths, [id]: width } }))
+  }, [])
+
   return {
     visibleColumns,
     allColumns: state.order,
+    widths: state.widths,
     setColumnVisibility,
     reorderColumns,
+    setColumnWidth,
     isVisible,
   }
 }

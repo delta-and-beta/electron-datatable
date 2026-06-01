@@ -215,6 +215,32 @@ export function Content({
   }
 
   /* -----------------------------------------------------------------------
+   * Column resize — drag the right edge of a header cell. The header cell's
+   * width drives the whole column; the chosen width is persisted via useColumns.
+   * ----------------------------------------------------------------------- */
+
+  function startResize(e: React.MouseEvent, columnId: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    const th = (e.currentTarget as HTMLElement).closest('th')
+    const startX = e.clientX
+    const startWidth = th ? th.getBoundingClientRect().width : 150
+    const onMove = (ev: MouseEvent) => {
+      columnState.setColumnWidth(columnId, Math.max(60, Math.round(startWidth + (ev.clientX - startX))))
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  /* -----------------------------------------------------------------------
    * Render
    * ----------------------------------------------------------------------- */
 
@@ -245,10 +271,11 @@ export function Content({
                 scope="col"
                 aria-sort={ariaSortValue}
                 className={cn(
+                  'relative',
                   align === 'right' && 'text-right',
                   align === 'center' && 'text-center',
                 )}
-                style={col.width ? { width: col.width } : undefined}
+                style={{ width: columnState.widths[col.id] ?? col.width }}
               >
                 {isSortable ? (
                   <button
@@ -262,6 +289,15 @@ export function Content({
                 ) : (
                   col.headerRender ? col.headerRender() : col.label
                 )}
+                {/* Drag handle on the column's right edge */}
+                <span
+                  role="separator"
+                  aria-orientation="vertical"
+                  onMouseDown={(e) => startResize(e, col.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  title="Drag to resize"
+                  className="absolute top-0 right-0 z-10 h-full w-1.5 cursor-col-resize select-none hover:bg-dt-primary/50"
+                />
               </TableHead>
             )
           })}

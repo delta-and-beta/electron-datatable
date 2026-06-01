@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.8] - 2026-06-01
+
+### Added
+
+- **Resizable columns.** Drag the right edge of any column header to set its
+  width; the chosen widths persist per-table (localStorage) and survive reloads.
+  The header-cell width drives the whole column. `useColumns` now exposes
+  `widths` and `setColumnWidth`.
+
 ## [0.1.7] - 2026-06-01
 
 ### Changed
