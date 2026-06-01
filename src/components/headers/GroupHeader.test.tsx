@@ -49,6 +49,14 @@ describe('GroupHeader', () => {
     expect(screen.getByText('5')).toBeInTheDocument()
   })
 
+  it('shows the grouped field name on top, at every level including the top level', () => {
+    renderGroupHeader() // level 0
+    expect(screen.getByText('Category')).toBeInTheDocument()
+    renderGroupHeader({ level: 2, fieldLabel: 'Confidence', groupKey: 'High' })
+    expect(screen.getByText('Confidence')).toBeInTheDocument()
+    expect(screen.getByText('High')).toBeInTheDocument()
+  })
+
   it('formats currency sum in the correct column cell', () => {
     renderGroupHeader()
     const text = document.body.textContent!

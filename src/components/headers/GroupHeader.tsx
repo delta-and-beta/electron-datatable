@@ -61,9 +61,10 @@ function getAlign(col: ColumnDef): 'left' | 'center' | 'right' {
   return col.align ?? ((col.type === 'currency' || col.type === 'number') ? 'right' : 'left')
 }
 
-/** Level-tinted group-header background — strongest at the top level, lighter when nested. */
+/** Level-tinted group-header background — strongest at the top level, lighter when nested.
+ *  Higher-contrast tints so grouped rows stand out clearly from data rows. */
 function groupBg(level: number, stuck: boolean): string {
-  const tint = level <= 0 ? 18 : level === 1 ? 11 : 6
+  const tint = level <= 0 ? 32 : level === 1 ? 21 : 13
   const base = stuck ? 'var(--dt-bg, #14142a)' : 'var(--dt-bg-secondary, #1f2937)'
   return `color-mix(in srgb, var(--dt-primary, #6366f1) ${tint}%, ${base})`
 }
@@ -182,7 +183,7 @@ export function GroupHeader({
 
   // Reduced indentation, more vertical breathing room, and level-aware shading.
   const paddingLeft = 12 + level * 14
-  const padY = level <= 0 ? 12 : 8
+  const padY = level <= 0 ? 8 : 6
   const bgColor = groupBg(level, isStuck)
   const accentColor = groupAccent(level)
 
@@ -221,7 +222,7 @@ export function GroupHeader({
         {extraColSpan > 0 && (
           <td
             key="__extra"
-            className={cn('sticky transition-colors duration-150')}
+            className={cn('sticky border-b border-r border-dt-border transition-colors duration-150')}
             style={{ top: stickyOffset, width: '50px', backgroundColor: bgColor, paddingTop: padY, paddingBottom: padY }}
           />
         )}
@@ -234,7 +235,10 @@ export function GroupHeader({
             return (
               <td
                 key={col.id}
-                className={cn('sticky pr-4 transition-colors duration-150')}
+                className={cn(
+                  'sticky pr-3 border-b border-dt-border transition-colors duration-150',
+                  idx < columns.length - 1 && 'border-r border-dt-border',
+                )}
                 style={{
                   top: stickyOffset,
                   paddingLeft,
@@ -255,20 +259,18 @@ export function GroupHeader({
                     )}
                   </span>
 
-                  {/* Field label badge (subgroups only) */}
-                  {level > 0 && (
-                    <span className="flex-shrink-0 rounded bg-dt-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-dt-muted">
+                  {/* Grouped field name on top, value wrapped as a pill below */}
+                  <span className="flex min-w-0 flex-col items-start gap-0.5">
+                    <span className="text-[10px] font-medium uppercase tracking-wider leading-none text-dt-muted">
                       {fieldLabel}
                     </span>
-                  )}
-
-                  {/* Group key */}
-                  <span className="truncate font-semibold text-dt-text">
-                    {groupKey}
+                    <span className="inline-block max-w-full truncate rounded-full border border-dt-border bg-[var(--dt-bg,#14142a)] px-2.5 py-0.5 text-sm font-semibold leading-tight text-dt-text">
+                      {groupKey}
+                    </span>
                   </span>
 
-                  {/* Record count badge */}
-                  <span className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs text-dt-muted ring-1 ring-dt-border">
+                  {/* Record count — pushed to the right edge of the first column */}
+                  <span className="ml-auto flex-shrink-0 rounded-full px-2 py-0.5 text-xs text-dt-muted ring-1 ring-dt-border">
                     {count}
                   </span>
                 </div>
@@ -285,10 +287,11 @@ export function GroupHeader({
               <td
                 key={col.id}
                 className={cn(
-                  'sticky px-4 tabular-nums transition-colors duration-150',
+                  'sticky px-4 tabular-nums border-b border-dt-border transition-colors duration-150',
                   align === 'right' && 'text-right',
                   align === 'center' && 'text-center',
                   value < 0 ? 'text-dt-negative' : 'text-dt-positive',
+                  idx < columns.length - 1 && 'border-r border-dt-border',
                 )}
                 style={{
                   top: stickyOffset,
@@ -312,9 +315,10 @@ export function GroupHeader({
             <td
               key={col.id}
               className={cn(
-                'sticky px-4 transition-colors duration-150',
+                'sticky px-4 border-b border-dt-border transition-colors duration-150',
                 align === 'right' && 'text-right',
                 align === 'center' && 'text-center',
+                idx < columns.length - 1 && 'border-r border-dt-border',
               )}
               style={{
                 top: stickyOffset,

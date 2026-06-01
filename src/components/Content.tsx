@@ -79,12 +79,11 @@ export function Content({
   const isEmpty = sortedData.length === 0
 
   // When grouped, every data row is a leaf at the deepest level
-  // (groupBy.levels.length). Indent its first column so it nests under the group
-  // header instead of sitting flush-left: align with the deepest header's label,
-  // i.e. that header's paddingLeft (12 + level*14) plus the chevron + gap (24px)
-  // that precede the label inside GroupHeader's first cell.
+  // (groupBy.levels.length). Indent its first column to line up with the deepest
+  // group header's disclosure chevron — i.e. that header's own paddingLeft
+  // (12 + level*14, level = depth-1) — so the row sits directly under the arrow.
   const groupRowIndent =
-    groupBy.levels.length > 0 ? 12 + (groupBy.levels.length - 1) * 14 + 24 : undefined
+    groupBy.levels.length > 0 ? 12 + (groupBy.levels.length - 1) * 14 : undefined
 
   // Aggregate cell renderer — same pipeline as data cells but without a row
   const renderAggregateCell = renderCell

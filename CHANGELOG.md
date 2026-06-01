@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.5] - 2026-06-01
+
+### Changed
+
+- **Group header redesign.** The grouped field name (e.g. "Fiscal Year") now
+  shows as a small uppercase label *above* the value at every level (previously
+  only subgroups showed it, inline). The group value is wrapped in a shadcn-style
+  rounded pill, and the record count is pushed to the right edge of the first
+  column (`ml-auto`). Group rows now draw column borders (`border-r`/`border-b`)
+  so the column grid stays visible when grouped, and the level-tinted background
+  contrast was increased (tints 32/21/13, was 18/11/6).
+- **Data rows align with the group arrow.** A grouped data row's first column now
+  indents to `12 + (depth-1)*14` — lining up with the deepest group header's
+  disclosure chevron (previously offset a further 24px to the label).
+
 ## [0.1.4] - 2026-05-31
 
 ### Changed
