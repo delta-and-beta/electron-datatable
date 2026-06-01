@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.6] - 2026-06-01
+
+### Added
+
+- **Filter value dropdown.** A new `ColumnDef.options` lets a column declare a
+  predefined choice set; when present, the filter condition row renders a value
+  dropdown (Airtable-style) that pre-selects the current value, instead of a
+  free-text input. Text columns already expose `is` / `is not`, so single-select
+  filtering reads naturally (e.g. *stage is not Closed - No-Go*).
+
 ## [0.1.5] - 2026-06-01
 
 ### Changed

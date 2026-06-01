@@ -89,7 +89,29 @@ export function FilterConditionRow({
         ))}
       </select>
 
-      {needsValue(condition.operator) ? (
+      {!needsValue(condition.operator) ? (
+        <span className="flex-1" />
+      ) : column?.options && column.options.length > 0 ? (
+        // Airtable-style value dropdown for columns with a predefined option set
+        <select
+          value={String(condition.value ?? '')}
+          onChange={(e) => onUpdate(condition.id, { value: e.target.value })}
+          className={cn(selectClass, 'flex-1 min-w-0')}
+        >
+          <option value="" disabled>
+            Select…
+          </option>
+          {column.options.map((opt) => {
+            const optValue = typeof opt === 'string' ? opt : opt.value
+            const optLabel = typeof opt === 'string' ? opt : opt.label ?? opt.value
+            return (
+              <option key={optValue} value={optValue}>
+                {optLabel}
+              </option>
+            )
+          })}
+        </select>
+      ) : (
         <input
           type={valueInputType}
           value={condition.value}
@@ -97,8 +119,6 @@ export function FilterConditionRow({
           placeholder="Value..."
           className={cn(selectClass, 'flex-1 min-w-0')}
         />
-      ) : (
-        <span className="flex-1" />
       )}
 
       <button

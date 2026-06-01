@@ -24,6 +24,9 @@ export interface ColumnDef<T extends RowData = RowData> {
   searchable?: boolean
   visible?: boolean
   filterable?: boolean
+  /** Predefined value choices (e.g. a single-select field). When set, the filter
+   *  renders a value dropdown (Airtable-style) instead of a free-text input. */
+  options?: Array<string | { value: string; label?: string }>
 
   // Grouping
   datePeriods?: DatePeriod[]
