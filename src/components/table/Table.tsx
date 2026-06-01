@@ -12,7 +12,12 @@ const Table = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <table
     ref={ref}
-    className={cn('w-full caption-bottom text-sm', className)}
+    className={cn(
+      'w-full caption-bottom text-sm',
+      // Column grid: vertical borders on every cell (data, header, group), last column excluded
+      '[&_td]:border-r [&_td]:border-dt-border [&_th]:border-r [&_th]:border-dt-border [&_tr>:last-child]:border-r-0',
+      className,
+    )}
     {...props}
   />
 ))

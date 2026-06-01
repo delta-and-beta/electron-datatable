@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.7] - 2026-06-01
+
+### Changed
+
+- Column grid borders now render on data rows and the header too (not only group
+  rows), driven by the `Table` primitive — a consistent vertical grid across the
+  whole table. The last column is excluded so there is no trailing edge line.
+- The group-header record count is now a plain right-aligned number (removed the
+  circular ring/pill around it).
+
 ## [0.1.6] - 2026-06-01
 
 ### Added

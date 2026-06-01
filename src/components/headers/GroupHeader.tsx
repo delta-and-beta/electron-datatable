@@ -269,8 +269,8 @@ export function GroupHeader({
                     </span>
                   </span>
 
-                  {/* Record count — pushed to the right edge of the first column */}
-                  <span className="ml-auto flex-shrink-0 rounded-full px-2 py-0.5 text-xs text-dt-muted ring-1 ring-dt-border">
+                  {/* Record count — plain number at the right edge of the first column */}
+                  <span className="ml-auto flex-shrink-0 text-xs font-medium tabular-nums text-dt-muted">
                     {count}
                   </span>
                 </div>
