@@ -5,6 +5,7 @@ import { formatDate, formatNumber, formatCurrency } from '../lib/format'
 import { useDataTable } from '../context'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table'
 import { GroupHeader } from './headers'
+import { StatusBadge } from './StatusBadge'
 import type { RowData, ColumnDef, GroupedSection } from '../types'
 import { asRecord } from '../lib/as-record'
 
@@ -30,9 +31,23 @@ interface ContentProps<T extends object> {
  * Default cell rendering
  * --------------------------------------------------------------------------- */
 
-function defaultRenderCell<T extends object>(column: ColumnDef<T>, value: unknown): React.ReactNode {
+function defaultRenderCell<T extends object>(
+  column: ColumnDef<T>,
+  value: unknown,
+  useBadgeVariants = false,
+): React.ReactNode {
   if (column.render) {
     return column.render(value, {} as T)
+  }
+
+  if (useBadgeVariants && column.badgeVariants) {
+    if (value == null || value === '') return '-'
+
+    return (
+      <StatusBadge variant={column.badgeVariants[String(value)] ?? 'neutral'}>
+        {String(value)}
+      </StatusBadge>
+    )
   }
 
   if (column.format) {
@@ -160,7 +175,7 @@ export function Content<T extends object = RowData>({
                 ? renderCell(col, value, row)
                 : col.render
                   ? col.render(value, row)
-                  : defaultRenderCell(col, value)}
+                  : defaultRenderCell(col, value, true)}
             </TableCell>
           )
         })}

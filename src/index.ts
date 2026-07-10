@@ -58,6 +58,8 @@ export { FilterToolbarButton } from './components/toolbar/FilterToolbarButton'
 export { FilterConfigPanel } from './components/toolbar/FilterConfigPanel'
 export { FilterConditionRow } from './components/toolbar/FilterConditionRow'
 export { GroupHeader } from './components/headers/GroupHeader'
+export { StatusBadge } from './components/StatusBadge'
+export type { BadgeVariant } from './components/StatusBadge'
 
 // Table primitives
 export {

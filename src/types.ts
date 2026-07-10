@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { BadgeVariant } from './components/StatusBadge'
 
 /** @deprecated Use your domain row type directly instead */
 export type RowData = Record<string, unknown>
@@ -17,6 +18,7 @@ export interface ColumnDef<T extends object = RowData> {
   headerRender?: () => ReactNode
   width?: string
   align?: 'left' | 'center' | 'right'
+  badgeVariants?: Record<string, BadgeVariant>
 
   // Behavior
   sortable?: boolean
