@@ -21,7 +21,12 @@ export type DatePeriod = 'day' | 'week' | 'month' | 'quarter' | 'year'
 export interface ColumnDef<T extends object = RowData> {
   id: string
   label: string
-  type: 'text' | 'number' | 'date' | 'currency' | 'custom'
+  /**
+   * `tags` values are `string[]`. Consumers with object arrays should map them
+   * to labels in their accessor or `render`. Tags sort by array length, then
+   * first label, and cannot be grouped.
+   */
+  type: 'text' | 'number' | 'date' | 'currency' | 'custom' | 'tags'
 
   // Display
   render?: (value: unknown, row: T) => ReactNode
@@ -90,15 +95,18 @@ export type NumberOperator = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'is_em
 /** Filter operators for date columns */
 export type DateOperator = 'is' | 'is_before' | 'is_after' | 'is_on_or_before' | 'is_on_or_after' | 'is_empty' | 'is_not_empty'
 
+/** Filter operators for tags columns */
+export type TagsOperator = 'contains_any' | 'contains_all' | 'is_empty' | 'is_not_empty'
+
 /** Union of all filter operators */
-export type FilterOperator = TextOperator | NumberOperator | DateOperator
+export type FilterOperator = TextOperator | NumberOperator | DateOperator | TagsOperator
 
 /** A single filter condition: field + operator + value */
 export interface FilterCondition {
   id: string
   field: string
   operator: FilterOperator
-  value: string
+  value: string | string[]
 }
 
 /** A group of conditions joined by a single conjunction, with optional nested sub-groups */

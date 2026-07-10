@@ -24,6 +24,7 @@ import { DataTableErrorBoundary } from './ErrorBoundary'
 import { devWarn } from '../lib/dev-warn'
 import { cn } from '../lib/utils'
 import { ACTIONS_COLUMN_ID, makeActionsColumn } from '../actions'
+import { asRecord } from '../lib/as-record'
 
 function DataTableRoot<T extends object = RowData>({
   data,
@@ -41,12 +42,32 @@ function DataTableRoot<T extends object = RowData>({
   className,
   children,
 }: DataTableProps<T>) {
-  const tableColumns = useMemo(
-    () => actions && actions.length > 0
-      ? [...columns, makeActionsColumn(actions)]
-      : columns,
-    [actions, columns],
-  )
+  const tableColumns = useMemo(() => {
+    const columnsWithTagOptions = columns.map((column) => {
+      if (column.type !== 'tags' || column.options !== undefined) return column
+
+      const values = new Set<string>()
+      for (const row of data) {
+        const tags = asRecord(row)[column.id]
+        if (!Array.isArray(tags)) continue
+        for (const tag of tags) {
+          if (typeof tag === 'string') values.add(tag)
+        }
+      }
+
+      return {
+        ...column,
+        options: [...values].sort((a, b) => a.localeCompare(b, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        })),
+      }
+    })
+
+    return actions && actions.length > 0
+      ? [...columnsWithTagOptions, makeActionsColumn(actions)]
+      : columnsWithTagOptions
+  }, [actions, columns, data])
 
   const configurableColumns = useMemo(
     () => tableColumns.filter((column) => column.id !== ACTIONS_COLUMN_ID),
@@ -235,7 +256,7 @@ function FullPresetToolbar({
   toolbarExtra?: React.ReactNode
 }) {
   const { groupBy, filter, columns, sort } = useDataTable()
-  const groupableColumns = columns.filter((c) => c.groupable !== false)
+  const groupableColumns = columns.filter((c) => c.groupable !== false && c.type !== 'tags')
 
   return (
     <Toolbar>

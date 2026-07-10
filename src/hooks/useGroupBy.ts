@@ -4,6 +4,10 @@ import { groupRecords } from '../lib/group-by'
 
 const MAX_LEVELS = 3
 
+function isGroupable<T extends object>(column: ColumnDef<T>): boolean {
+  return column.groupable !== false && column.type !== 'tags'
+}
+
 interface UseGroupByOptions<T extends object> {
   data: T[]
   columns: ColumnDef<T>[]
@@ -23,13 +27,14 @@ export function useGroupBy<T extends object>({
 
   // Load initial state from localStorage, falling back to defaultLevels
   const [levels, setLevels] = useState<GroupLevel[]>(() => {
+    const validFields = new Set(columns.filter(isGroupable).map((column) => column.id))
+    const tagFields = new Set(columns.filter((column) => column.type === 'tags').map((column) => column.id))
     if (fullKey) {
       try {
         const saved = localStorage.getItem(fullKey)
         if (saved) {
           const config = JSON.parse(saved)
           if (config && Array.isArray(config.groups)) {
-            const validFields = new Set(columns.filter((c) => c.groupable !== false).map((c) => c.id))
             return config.groups.filter(
               (g: unknown) => g && typeof g === 'object' && 'field' in g && typeof (g as GroupLevel).field === 'string' && validFields.has((g as GroupLevel).field)
             )
@@ -39,7 +44,7 @@ export function useGroupBy<T extends object>({
         // ignore
       }
     }
-    return defaultLevels
+    return defaultLevels.filter((level) => !tagFields.has(level.field))
   })
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
@@ -108,6 +113,7 @@ export function useGroupBy<T extends object>({
         if (prev.length >= MAX_LEVELS) return prev
         if (prev.some((g) => g.field === field)) return prev
         const column = columns.find((c) => c.id === field)
+        if (column?.type === 'tags') return prev
         return [
           ...prev,
           {

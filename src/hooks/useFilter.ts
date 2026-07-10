@@ -111,10 +111,13 @@ export function useFilter<T extends object>({
     setRoot((prev) =>
       updateGroupInTree(prev, groupId, (g) => ({
         ...g,
-        conditions: [...g.conditions, createEmptyCondition(field)],
+        conditions: [
+          ...g.conditions,
+          createEmptyCondition(field, columns.find((column) => column.id === field)?.type),
+        ],
       })),
     )
-  }, [])
+  }, [columns])
 
   const removeCondition = useCallback((groupId: string, conditionId: string) => {
     setRoot((prev) =>

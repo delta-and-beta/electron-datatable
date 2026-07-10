@@ -68,6 +68,21 @@ function defaultRenderCell<T extends object>(
         decimalPlaces: column.decimalPlaces,
         symbol: column.symbol,
       })
+    case 'tags': {
+      const tags = Array.isArray(value)
+        ? value.filter((tag): tag is string => typeof tag === 'string')
+        : []
+      if (tags.length === 0) return '-'
+      return (
+        <div className="flex flex-wrap gap-1">
+          {tags.map((tag, index) => (
+            <StatusBadge key={`${tag}-${index}`} variant="neutral">
+              {tag}
+            </StatusBadge>
+          ))}
+        </div>
+      )
+    }
     case 'text':
     default:
       return String(value)

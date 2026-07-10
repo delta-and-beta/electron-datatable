@@ -1,6 +1,6 @@
 import { asRecord } from './as-record'
 
-/** Compare two values for sorting */
+/** Compare two values for sorting. Arrays sort by length, then first label. */
 export function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc'): number {
   // Nulls always sort last
   if (a == null && b == null) return 0
@@ -9,7 +9,15 @@ export function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc')
 
   let cmp: number
 
-  if (typeof a === 'number' && typeof b === 'number') {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    cmp = a.length - b.length
+    if (cmp === 0) {
+      cmp = String(a[0] ?? '').localeCompare(String(b[0] ?? ''), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    }
+  } else if (typeof a === 'number' && typeof b === 'number') {
     cmp = a - b
   } else if (typeof a === 'string' && typeof b === 'string') {
     cmp = a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })

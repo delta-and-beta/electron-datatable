@@ -15,13 +15,14 @@ const columns: ColumnDef[] = [
   { id: 'date', label: 'Date', type: 'date' },
   { id: 'price', label: 'Price', type: 'currency' },
   { id: 'custom', label: 'Custom', type: 'custom' },
+  { id: 'tags', label: 'Tags', type: 'tags' },
 ]
 
 const data = [
-  { id: '1', name: 'Alice', amount: 100, date: '2024-01-15', price: 50 },
-  { id: '2', name: 'Bob', amount: 200, date: '2024-03-20', price: 75 },
-  { id: '3', name: 'Charlie', amount: 50, date: '2024-06-10', price: 100 },
-  { id: '4', name: '', amount: 0, date: '', price: 0 },
+  { id: '1', name: 'Alice', amount: 100, date: '2024-01-15', price: 50, tags: ['remote', 'vip'] },
+  { id: '2', name: 'Bob', amount: 200, date: '2024-03-20', price: 75, tags: ['finance'] },
+  { id: '3', name: 'Charlie', amount: 50, date: '2024-06-10', price: 100, tags: [] },
+  { id: '4', name: '', amount: 0, date: '', price: 0, tags: ['remote'] },
   { id: '5', name: 'alice', amount: null, date: null, price: null },
 ]
 
@@ -57,6 +58,15 @@ describe('getOperatorsForColumnType', () => {
   it('returns text operators for custom type', () => {
     const ops = getOperatorsForColumnType('custom')
     expect(ops).toContain('contains')
+  })
+
+  it('returns multi-value and emptiness operators for tags type', () => {
+    expect(getOperatorsForColumnType('tags')).toEqual([
+      'contains_any',
+      'contains_all',
+      'is_empty',
+      'is_not_empty',
+    ])
   })
 })
 
@@ -261,6 +271,35 @@ describe('filterRecords — date operators', () => {
     const group = makeGroup([{ id: '1', field: 'date', operator: 'is_empty', value: '' }])
     const result = filterRecords(data, group, columns)
     expect(result.map((r) => r.id)).toEqual(['4', '5'])
+  })
+})
+
+describe('filterRecords — tags operators', () => {
+  function makeGroup(operator: 'contains_any' | 'contains_all' | 'is_empty' | 'is_not_empty', value: string[] = []): FilterGroup {
+    return {
+      ...createEmptyGroup(),
+      conditions: [{ id: '1', field: 'tags', operator, value }],
+    }
+  }
+
+  it('contains_any matches a row with at least one selected tag', () => {
+    const result = filterRecords(data, makeGroup('contains_any', ['vip', 'finance']), columns)
+    expect(result.map((row) => row.id)).toEqual(['1', '2'])
+  })
+
+  it('contains_all matches only rows containing every selected tag', () => {
+    const result = filterRecords(data, makeGroup('contains_all', ['remote', 'vip']), columns)
+    expect(result.map((row) => row.id)).toEqual(['1'])
+  })
+
+  it('is_empty matches empty arrays and undefined fields', () => {
+    const result = filterRecords(data, makeGroup('is_empty'), columns)
+    expect(result.map((row) => row.id)).toEqual(['3', '5'])
+  })
+
+  it('is_not_empty excludes empty arrays and undefined fields', () => {
+    const result = filterRecords(data, makeGroup('is_not_empty'), columns)
+    expect(result.map((row) => row.id)).toEqual(['1', '2', '4'])
   })
 })
 

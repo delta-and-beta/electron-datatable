@@ -14,6 +14,8 @@ export function getOperatorsForColumnType(type: ColumnDef['type']): FilterOperat
       return ['eq', 'neq', 'gt', 'lt', 'gte', 'lte', 'is_empty', 'is_not_empty']
     case 'date':
       return ['is', 'is_before', 'is_after', 'is_on_or_before', 'is_on_or_after', 'is_empty', 'is_not_empty']
+    case 'tags':
+      return ['contains_any', 'contains_all', 'is_empty', 'is_not_empty']
     case 'text':
     case 'custom':
     default:
@@ -21,7 +23,10 @@ export function getOperatorsForColumnType(type: ColumnDef['type']): FilterOperat
   }
 }
 
-export function createEmptyCondition(field: string): FilterCondition {
+export function createEmptyCondition(field: string, type: ColumnDef['type'] = 'text'): FilterCondition {
+  if (type === 'tags') {
+    return { id: generateId(), field, operator: 'contains_any', value: [] }
+  }
   return { id: generateId(), field, operator: 'contains', value: '' }
 }
 
@@ -38,8 +43,8 @@ export function countConditions(group: FilterGroup): number {
   return group.conditions.length + group.groups.reduce((sum, g) => sum + countConditions(g), 0)
 }
 
-function isEmpty(value: unknown): boolean {
-  return value === null || value === undefined || value === ''
+function isEmpty(value: unknown, type?: ColumnDef['type']): boolean {
+  return value === null || value === undefined || value === '' || (type === 'tags' && Array.isArray(value) && value.length === 0)
 }
 
 function evaluateCondition<T extends object>(record: T, condition: FilterCondition, columns: ColumnDef<T>[]): boolean {
@@ -47,14 +52,13 @@ function evaluateCondition<T extends object>(record: T, condition: FilterConditi
   if (!column) return true
 
   const rawValue = asRecord(record)[condition.field]
+  const colType = column.type ?? 'text'
 
-  if (condition.operator === 'is_empty') return isEmpty(rawValue)
-  if (condition.operator === 'is_not_empty') return !isEmpty(rawValue)
+  if (condition.operator === 'is_empty') return isEmpty(rawValue, colType)
+  if (condition.operator === 'is_not_empty') return !isEmpty(rawValue, colType)
 
   // Skip incomplete conditions (no value entered yet) — treat as "not configured"
-  if (condition.value === '') return true
-
-  const colType = column.type ?? 'text'
+  if (condition.value === '' || (Array.isArray(condition.value) && condition.value.length === 0)) return true
 
   switch (colType) {
     case 'number':
@@ -62,6 +66,8 @@ function evaluateCondition<T extends object>(record: T, condition: FilterConditi
       return evaluateNumberCondition(rawValue, condition)
     case 'date':
       return evaluateDateCondition(rawValue, condition)
+    case 'tags':
+      return evaluateTagsCondition(rawValue, condition)
     case 'text':
     case 'custom':
     default:
@@ -71,7 +77,7 @@ function evaluateCondition<T extends object>(record: T, condition: FilterConditi
 
 function evaluateTextCondition(rawValue: unknown, condition: FilterCondition): boolean {
   const recordStr = rawValue == null ? '' : String(rawValue)
-  const filterVal = condition.value
+  const filterVal = typeof condition.value === 'string' ? condition.value : ''
 
   switch (condition.operator) {
     case 'is': return recordStr === filterVal
@@ -85,7 +91,7 @@ function evaluateTextCondition(rawValue: unknown, condition: FilterCondition): b
 function evaluateNumberCondition(rawValue: unknown, condition: FilterCondition): boolean {
   if (isEmpty(rawValue)) return false
   const num = Number(rawValue)
-  const filterNum = parseFloat(condition.value)
+  const filterNum = parseFloat(typeof condition.value === 'string' ? condition.value : '')
   if (isNaN(num) || isNaN(filterNum)) return false
 
   switch (condition.operator) {
@@ -135,6 +141,19 @@ function evaluateDateCondition(rawValue: unknown, condition: FilterCondition): b
     case 'is_on_or_after': return rd >= fd
     default: return evaluateTextCondition(String(rawValue), condition)
   }
+}
+
+function evaluateTagsCondition(rawValue: unknown, condition: FilterCondition): boolean {
+  if (!Array.isArray(rawValue) || !Array.isArray(condition.value)) return false
+
+  const rowTags = new Set(rawValue.filter((value): value is string => typeof value === 'string'))
+  if (condition.operator === 'contains_any') {
+    return condition.value.some((value) => rowTags.has(value))
+  }
+  if (condition.operator === 'contains_all') {
+    return condition.value.every((value) => rowTags.has(value))
+  }
+  return false
 }
 
 function evaluateGroup<T extends object>(record: T, group: FilterGroup, columns: ColumnDef<T>[]): boolean {

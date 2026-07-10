@@ -13,6 +13,7 @@ export type {
   TextOperator,
   NumberOperator,
   DateOperator,
+  TagsOperator,
   FilterOperator,
   FilterCondition,
   FilterGroup,

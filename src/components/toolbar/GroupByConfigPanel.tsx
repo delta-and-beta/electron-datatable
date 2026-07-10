@@ -80,7 +80,7 @@ export function GroupByConfigPanel({
   }
 
   const usedFields = new Set(levels.map((l) => l.field))
-  const availableFields = columns.filter((c) => c.groupable !== false && !usedFields.has(c.id))
+  const availableFields = columns.filter((c) => c.groupable !== false && c.type !== 'tags' && !usedFields.has(c.id))
   const canAddMore = levels.length < MAX_LEVELS && availableFields.length > 0
 
   function getColumnType(field: string): string {

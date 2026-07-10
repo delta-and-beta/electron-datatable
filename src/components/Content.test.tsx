@@ -208,4 +208,41 @@ describe('Content', () => {
     expect(screen.getByText('custom:active').tagName).toBe('STRONG')
     expect(screen.queryByText('active')).not.toBeInTheDocument()
   })
+
+  it('renders tag values as neutral status badges by default', () => {
+    const tagColumns: ColumnDef[] = [
+      { id: 'tags', label: 'Tags', type: 'tags' },
+    ]
+
+    render(
+      <DataTable
+        columns={tagColumns}
+        data={[{ id: '1', tags: ['Remote', 'VIP'] }]}
+        rowKey="id"
+        storageKey="tags-badges"
+        preset="minimal"
+      />,
+    )
+
+    expect(screen.getByText('Remote')).toHaveClass('bg-dt-muted/10', 'text-dt-muted')
+    expect(screen.getByText('VIP')).toHaveClass('bg-dt-muted/10', 'text-dt-muted')
+  })
+
+  it('renders the existing placeholder for an empty tags array', () => {
+    const tagColumns: ColumnDef[] = [
+      { id: 'tags', label: 'Tags', type: 'tags' },
+    ]
+
+    render(
+      <DataTable
+        columns={tagColumns}
+        data={[{ id: '1', tags: [] }]}
+        rowKey="id"
+        storageKey="tags-empty"
+        preset="minimal"
+      />,
+    )
+
+    expect(screen.getByText('-').tagName).toBe('TD')
+  })
 })
