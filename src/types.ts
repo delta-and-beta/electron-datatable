@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { BadgeVariant } from './components/StatusBadge'
+import type { FooterKpi } from './components/Footer'
 
 /** @deprecated Use your domain row type directly instead */
 export type RowData = Record<string, unknown>
@@ -153,6 +154,7 @@ export interface DataTableProps<T extends object = RowData> {
   onRowClick?: (row: T) => void
   onRowContextMenu?: (row: T, event: React.MouseEvent) => void
   toolbarExtra?: ReactNode
+  footerKpis?: FooterKpi[]
   className?: string
   children?: ReactNode
 }

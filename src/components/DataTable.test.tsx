@@ -26,6 +26,21 @@ describe('DataTable', () => {
     expect(screen.getByText(/3 of 3 records/)).toBeInTheDocument()
   })
 
+  it('threads footerKpis through preset="full"', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={data}
+        rowKey="id"
+        preset="full"
+        footerKpis={[{ label: 'Revenue', value: '$12,400', accent: 'info' }]}
+      />,
+    )
+
+    expect(screen.getByText('Revenue')).toBeInTheDocument()
+    expect(screen.getByText('$12,400')).toHaveClass('text-dt-primary')
+  })
+
   it('renders preset="minimal" without toolbar', () => {
     render(<DataTable columns={columns} data={data} rowKey="id" preset="minimal" />)
     expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument()

@@ -10,7 +10,7 @@ import { useSort } from '../hooks/useSort'
 import { useFilter } from '../hooks/useFilter'
 import { Toolbar } from './Toolbar'
 import { Content } from './Content'
-import { Footer } from './Footer'
+import { Footer, type FooterKpi } from './Footer'
 import { Search } from './toolbar/Search'
 import { GroupByToolbarButton } from './toolbar/GroupByToolbarButton'
 import { GroupByConfigPanel } from './toolbar/GroupByConfigPanel'
@@ -39,6 +39,7 @@ function DataTableRoot<T extends object = RowData>({
   onRowClick,
   onRowContextMenu,
   toolbarExtra,
+  footerKpis,
   className,
   children,
 }: DataTableProps<T>) {
@@ -190,7 +191,11 @@ function DataTableRoot<T extends object = RowData>({
       <DataTableErrorBoundary>
         <DataTableProvider value={contextValue}>
           <div className={cn('relative', className)}>
-            <FullPreset<T> onRowClick={onRowClick} toolbarExtra={toolbarExtra} />
+            <FullPreset<T>
+              onRowClick={onRowClick}
+              toolbarExtra={toolbarExtra}
+              footerKpis={footerKpis}
+            />
           </div>
         </DataTableProvider>
       </DataTableErrorBoundary>
@@ -204,7 +209,7 @@ function DataTableRoot<T extends object = RowData>({
         <DataTableProvider value={contextValue}>
           <div className={cn('relative', className)}>
             <Content<T> onRowClick={onRowClick} />
-            <Footer />
+            <Footer kpis={footerKpis} />
           </div>
         </DataTableProvider>
       </DataTableErrorBoundary>
@@ -221,7 +226,15 @@ function DataTableRoot<T extends object = RowData>({
 }
 
 /** Full preset layout: toolbar + content + footer */
-function FullPreset<T extends object>({ onRowClick, toolbarExtra }: { onRowClick?: (row: T) => void; toolbarExtra?: React.ReactNode }) {
+function FullPreset<T extends object>({
+  onRowClick,
+  toolbarExtra,
+  footerKpis,
+}: {
+  onRowClick?: (row: T) => void
+  toolbarExtra?: React.ReactNode
+  footerKpis?: FooterKpi[]
+}) {
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
 
@@ -236,7 +249,7 @@ function FullPreset<T extends object>({ onRowClick, toolbarExtra }: { onRowClick
       />
       <div className="overflow-auto h-full">
         <Content<T> stickyHeader onRowClick={onRowClick} />
-        <Footer />
+        <Footer kpis={footerKpis} />
       </div>
     </>
   )
