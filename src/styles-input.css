@@ -1,1 +1,47 @@
 @tailwind utilities;
+
+.bg-dt-positive\/10 {
+  background-color: color-mix(in srgb, var(--dt-positive, #22c55e) 10%, transparent);
+}
+
+.bg-dt-negative\/10,
+.hover\:bg-dt-negative\/10:hover {
+  background-color: color-mix(in srgb, var(--dt-negative, #ef4444) 10%, transparent);
+}
+
+.bg-dt-primary\/10 {
+  background-color: color-mix(in srgb, var(--dt-primary, #3b82f6) 10%, transparent);
+}
+
+.bg-dt-muted\/10 {
+  background-color: color-mix(in srgb, var(--dt-muted, #9ca3af) 10%, transparent);
+}
+
+.bg-dt-bg\/80 {
+  background-color: color-mix(in srgb, var(--dt-bg, #1a1a2e) 80%, transparent);
+}
+
+.bg-dt-bg-secondary\/50,
+.hover\:bg-dt-bg-secondary\/50:hover {
+  background-color: color-mix(in srgb, var(--dt-bg-secondary, #16213e) 50%, transparent);
+}
+
+.bg-dt-bg-secondary\/60 {
+  background-color: color-mix(in srgb, var(--dt-bg-secondary, #16213e) 60%, transparent);
+}
+
+.text-dt-muted\/50 {
+  color: color-mix(in srgb, var(--dt-muted, #9ca3af) 50%, transparent);
+}
+
+.border-dt-primary\/50 {
+  border-color: color-mix(in srgb, var(--dt-primary, #3b82f6) 50%, transparent);
+}
+
+.border-dt-negative\/30 {
+  border-color: color-mix(in srgb, var(--dt-negative, #ef4444) 30%, transparent);
+}
+
+.hover\:bg-dt-primary\/50:hover {
+  background-color: color-mix(in srgb, var(--dt-primary, #3b82f6) 50%, transparent);
+}

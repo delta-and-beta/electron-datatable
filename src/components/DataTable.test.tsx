@@ -82,6 +82,85 @@ describe('DataTable', () => {
   })
 
   describe('row actions', () => {
+    it('keeps a consumer actions column configurable', () => {
+      const domainColumns: ColumnDef<(typeof data)[number]>[] = [
+        { id: 'actions', label: 'Domain Actions', type: 'text' },
+        ...columns,
+      ]
+
+      render(
+        <DataTable
+          columns={domainColumns}
+          data={data.map((row) => ({ ...row, actions: 'Review' }))}
+          rowKey="id"
+          preset="full"
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Columns' }))
+
+      expect(
+        screen.getByRole('button', { name: 'Toggle Domain Actions visibility' }),
+      ).toBeInTheDocument()
+    })
+
+    it('keeps the generated actions column out of configurable column state', () => {
+      const actions: RowAction<(typeof data)[number]>[] = [
+        { key: 'edit', title: 'Edit row', onClick: vi.fn() },
+      ]
+
+      render(
+        <DataTable
+          columns={columns}
+          data={data}
+          rowKey="id"
+          preset="full"
+          actions={actions}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Columns' }))
+
+      expect(screen.queryByRole('button', { name: 'Toggle Actions visibility' })).not.toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: 'Edit row' })).toHaveLength(data.length)
+    })
+
+    it('lets a consumer actions column coexist with generated row actions without duplicate keys', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const domainColumns: ColumnDef<(typeof data)[number]>[] = [
+        ...columns,
+        {
+          id: 'actions',
+          label: 'Domain Actions',
+          type: 'custom',
+          render: () => 'Review state',
+        },
+      ]
+      const actions: RowAction<(typeof data)[number]>[] = [
+        { key: 'edit', title: 'Edit row', onClick: vi.fn() },
+      ]
+
+      try {
+        render(
+          <DataTable
+            columns={domainColumns}
+            data={data}
+            rowKey="id"
+            preset="minimal"
+            actions={actions}
+          />,
+        )
+
+        expect(screen.getAllByText('Review state')).toHaveLength(data.length)
+        expect(screen.getAllByRole('button', { name: 'Edit row' })).toHaveLength(data.length)
+        expect(
+          errorSpy.mock.calls.some((call) => call.some((value) => String(value).includes('same key'))),
+        ).toBe(false)
+      } finally {
+        errorSpy.mockRestore()
+      }
+    })
+
     it('renders actions for every row with accessible labels', () => {
       const actions: RowAction<(typeof data)[number]>[] = [
         { key: 'edit', title: 'Edit row', icon: <span>Edit</span>, onClick: vi.fn() },

@@ -132,8 +132,12 @@ export function useGroupBy<T extends object>({
   }, [])
 
   const updateGroup = useCallback((index: number, updates: Partial<GroupLevel>) => {
-    setLevels((prev) => prev.map((g, i) => (i === index ? { ...g, ...updates } : g)))
-  }, [])
+    setLevels((prev) => {
+      const column = updates.field ? columns.find((candidate) => candidate.id === updates.field) : undefined
+      if (column?.type === 'tags') return prev
+      return prev.map((g, i) => (i === index ? { ...g, ...updates } : g))
+    })
+  }, [columns])
 
   const reorderGroups = useCallback((fromIndex: number, toIndex: number) => {
     setLevels((prev) => {

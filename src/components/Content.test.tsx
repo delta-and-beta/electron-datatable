@@ -90,6 +90,28 @@ describe('Content', () => {
     expect(screen.getByText('¥500')).toBeInTheDocument()
   })
 
+  it.each([
+    ['number', '100'],
+    ['currency', '$100.00'],
+  ] as const)('uses tabular numerals for %s body cells', (type, expectedText) => {
+    const numericColumns: ColumnDef[] = [
+      type === 'currency'
+        ? { id: 'amount', label: 'Amount', type, symbol: '$' }
+        : { id: 'amount', label: 'Amount', type },
+    ]
+
+    render(
+      <DataTable
+        columns={numericColumns}
+        data={[{ id: '1', amount: 100 }]}
+        rowKey="id"
+        preset="minimal"
+      />,
+    )
+
+    expect(screen.getByText(expectedText).closest('td')).toHaveClass('tabular-nums')
+  })
+
   it('renders the empty placeholder for null currency cells', () => {
     const currencyColumns: ColumnDef[] = [
       {

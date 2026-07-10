@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef, useMemo } from 'react'
-import type { RowData, AttachmentAdapter } from '../types'
+import type { AttachmentAdapter } from '../types'
 import type { MatchingAdapter, MatchedFile, UnmatchedFile } from '../matching-types'
 import type { UseMatchingReturn } from '../matching-context'
 import { filterByMimeType, fileToBase64, DEFAULT_ACCEPTED_TYPES } from '../lib/matching-utils'
 
 type MatchingState = 'idle' | 'reading' | 'ocr' | 'matching' | 'duplicates' | 'reviewing' | 'attaching' | 'done' | 'error'
 
-interface UseMatchingOptions<T extends RowData> {
+interface UseMatchingOptions<T extends object> {
   matchingAdapter: MatchingAdapter<T> | null
   attachmentAdapter: AttachmentAdapter | null
   data: T[]
@@ -15,7 +15,7 @@ interface UseMatchingOptions<T extends RowData> {
 
 export type { UseMatchingReturn }
 
-export function useMatching<T extends RowData>(options: UseMatchingOptions<T>): UseMatchingReturn {
+export function useMatching<T extends object>(options: UseMatchingOptions<T>): UseMatchingReturn {
   const { matchingAdapter, attachmentAdapter, data, acceptedTypes = DEFAULT_ACCEPTED_TYPES } = options
   const enabled = matchingAdapter !== null && attachmentAdapter !== null
 

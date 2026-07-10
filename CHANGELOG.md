@@ -24,6 +24,16 @@ hand-rolling (see company-app docs/superpowers/specs/2026-07-10-datatable-upstre
   `contains_all` / `is_empty` filtering with a multi-select filter UI.
 - **KPI footer tiles.** `footerKpis: FooterKpi[]` renders label/value tiles in the footer bar.
 
+### Fixed
+
+- Ship working alpha-tinted `dt-*` backgrounds, borders, hover states, and muted text.
+- Accept plain-object row generics from the `/matching` entry point.
+- Keep consumer `actions` columns configurable and distinct from generated row actions.
+- Normalize currency decimal places to an integer from 0 through 20.
+- Prevent group updates from selecting non-groupable tags columns.
+- Place negative signs before custom currency symbols.
+- Use tabular numerals for number and currency body cells.
+
 ## [0.1.8] - 2026-06-01
 
 ### Added

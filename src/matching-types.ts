@@ -41,7 +41,7 @@ export interface MatchingProgress {
   total?: number
 }
 
-export interface MatchingAdapter<T extends RowData = RowData> {
+export interface MatchingAdapter<T extends object = RowData> {
   ocr(files: Array<{ filename: string; mimeType: string; dataBase64: string }>): Promise<OcrResult[]>
   match(
     ocrResults: OcrResult[],

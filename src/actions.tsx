@@ -1,7 +1,7 @@
 import type { ColumnDef, RowAction } from './types'
 import { cn } from './lib/utils'
 
-export const ACTIONS_COLUMN_ID = 'actions'
+export const ACTIONS_COLUMN_ID = '__dt_internal_actions'
 
 /** Build the reserved trailing row-actions column for manual composition. */
 export function makeActionsColumn<T extends object>(actions: RowAction<T>[]): ColumnDef<T> {

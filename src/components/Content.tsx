@@ -180,6 +180,7 @@ export function Content<T extends object = RowData>({
               className={cn(
                 align === 'right' && 'text-right',
                 align === 'center' && 'text-center',
+                (col.type === 'currency' || col.type === 'number') && 'tabular-nums',
               )}
               style={{
                 ...(col.width ? { width: col.width } : {}),

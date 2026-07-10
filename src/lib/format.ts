@@ -8,7 +8,10 @@ export function formatCurrency(
     symbol?: string
   } = {},
 ): string {
-  const decimalPlaces = options.decimalPlaces ?? 2
+  const requestedDecimalPlaces = options.decimalPlaces ?? 2
+  const decimalPlaces = Number.isFinite(requestedDecimalPlaces)
+    ? Math.min(20, Math.max(0, Math.trunc(requestedDecimalPlaces)))
+    : 2
   const displayValue = options.minorUnits
     ? value / 10 ** decimalPlaces
     : value
@@ -18,7 +21,9 @@ export function formatCurrency(
   }
 
   if (options.symbol !== undefined) {
-    return `${options.symbol}${new Intl.NumberFormat(undefined, fractionDigits).format(displayValue)}`
+    const sign = displayValue < 0 ? '-' : ''
+    const formattedValue = new Intl.NumberFormat(undefined, fractionDigits).format(Math.abs(displayValue))
+    return `${sign}${options.symbol}${formattedValue}`
   }
 
   return new Intl.NumberFormat(undefined, {
