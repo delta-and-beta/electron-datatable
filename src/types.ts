@@ -4,6 +4,16 @@ import type { BadgeVariant } from './components/StatusBadge'
 /** @deprecated Use your domain row type directly instead */
 export type RowData = Record<string, unknown>
 
+/** An icon-button action rendered for each table row */
+export type RowAction<T extends object> = {
+  key: string
+  title: string
+  icon?: ReactNode
+  onClick: (row: T) => void
+  show?: (row: T) => boolean
+  variant?: 'default' | 'danger'
+}
+
 /** Date bucketing period for group-by */
 export type DatePeriod = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
@@ -125,6 +135,7 @@ export interface Attachment {
 export interface DataTableProps<T extends object = RowData> {
   data: T[]
   columns: ColumnDef<T>[]
+  actions?: RowAction<T>[]
   rowKey: keyof T & string
   storageKey?: string
   preset?: 'full' | 'minimal' | 'none'

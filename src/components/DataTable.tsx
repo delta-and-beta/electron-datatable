@@ -23,10 +23,12 @@ import { GroupHeader } from './headers/GroupHeader'
 import { DataTableErrorBoundary } from './ErrorBoundary'
 import { devWarn } from '../lib/dev-warn'
 import { cn } from '../lib/utils'
+import { ACTIONS_COLUMN_ID, makeActionsColumn } from '../actions'
 
 function DataTableRoot<T extends object = RowData>({
   data,
   columns,
+  actions,
   rowKey,
   storageKey = 'dt',
   preset = 'none',
@@ -39,11 +41,23 @@ function DataTableRoot<T extends object = RowData>({
   className,
   children,
 }: DataTableProps<T>) {
+  const tableColumns = useMemo(
+    () => actions && actions.length > 0
+      ? [...columns, makeActionsColumn(actions)]
+      : columns,
+    [actions, columns],
+  )
+
+  const configurableColumns = useMemo(
+    () => tableColumns.filter((column) => column.id !== ACTIONS_COLUMN_ID),
+    [tableColumns],
+  )
+
   // Filter (condition-based)
-  const filter = useFilter({ data, columns, storageKey })
+  const filter = useFilter({ data, columns: tableColumns, storageKey })
 
   // Search (free-text, on filtered data)
-  const search = useSearch({ data: filter.filteredData, columns })
+  const search = useSearch({ data: filter.filteredData, columns: tableColumns })
 
   // Sort
   const sort = useSort({
@@ -54,16 +68,16 @@ function DataTableRoot<T extends object = RowData>({
   })
 
   // Columns
-  const columnState = useColumns({ columns, storageKey })
+  const columnState = useColumns({ columns: configurableColumns, storageKey })
 
   // Group-by
-  const sumFields = columns
+  const sumFields = tableColumns
     .filter((c) => c.sumInGroup !== false && (c.type === 'number' || c.type === 'currency'))
     .map((c) => c.id)
 
   const groupBy = useGroupBy({
     data: sort.sortedData,
-    columns,
+    columns: tableColumns,
     sumFields,
     storageKey,
     defaultLevels: defaultGroupBy,
@@ -101,7 +115,7 @@ function DataTableRoot<T extends object = RowData>({
       searchQuery: search.query,
       setSearchQuery: search.setQuery,
       sort,
-      columns,
+      columns: tableColumns,
       columnState,
       groupBy,
       filter,
@@ -121,7 +135,7 @@ function DataTableRoot<T extends object = RowData>({
       search.query,
       search.setQuery,
       sort,
-      columns,
+      tableColumns,
       columnState,
       groupBy,
       filter,
@@ -136,14 +150,14 @@ function DataTableRoot<T extends object = RowData>({
 
   // Dev-mode config validation
   useEffect(() => {
-    devWarn(columns.length === 0, 'columns array is empty')
+    devWarn(tableColumns.length === 0, 'columns array is empty')
     devWarn(
       data.length > 0 && !(rowKey in data[0]),
       `rowKey "${rowKey}" not found on data items`,
     )
     devWarn(storageKey === '', 'storageKey is empty string, localStorage persistence disabled')
     devWarn(
-      !!defaultSort?.field && !columns.some((c) => c.id === defaultSort.field),
+      !!defaultSort?.field && !tableColumns.some((c) => c.id === defaultSort.field),
       `defaultSort field "${defaultSort?.field}" not found in columns`,
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps

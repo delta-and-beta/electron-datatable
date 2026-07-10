@@ -1,6 +1,7 @@
 // Core types
 export type {
   RowData,
+  RowAction,
   ColumnDef,
   DatePeriod,
   GroupLevel,
@@ -20,6 +21,7 @@ export type {
 
 // Config helpers
 export { defineTable, defineColumns } from './defineTable'
+export { makeActionsColumn } from './actions'
 
 // Pure logic (framework-agnostic)
 export { groupRecords, getGroupKey, getDatePeriodKey, sortGroups } from './lib/group-by'

@@ -1,4 +1,4 @@
-import type { ColumnDef, GroupLevel } from './types'
+import type { ColumnDef, GroupLevel, RowAction } from './types'
 
 /** Column definition using object key as field ID */
 type ColumnConfig<T extends object> = Omit<ColumnDef<T>, 'id'>
@@ -8,6 +8,7 @@ interface TableConfig<T extends object> {
   rowKey: keyof T & string
   storageKey?: string
   columns: { [K in keyof T]?: ColumnConfig<T> }
+  actions?: RowAction<T>[]
   defaults?: {
     sort?: { field: keyof T & string; direction: 'asc' | 'desc' }
     groupBy?: GroupLevel[]
@@ -17,6 +18,7 @@ interface TableConfig<T extends object> {
 /** Return type — spread directly onto <DataTable> */
 interface TableDefinition<T extends object> {
   columns: ColumnDef<T>[]
+  actions?: RowAction<T>[]
   rowKey: keyof T & string
   storageKey?: string
   defaultSort?: { field: string; direction: 'asc' | 'desc' }
@@ -47,6 +49,7 @@ export function defineTable<T extends object>(config: TableConfig<T>): TableDefi
 
   return {
     columns,
+    actions: config.actions,
     rowKey: config.rowKey,
     storageKey: config.storageKey,
     defaultSort: config.defaults?.sort

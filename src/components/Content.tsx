@@ -8,6 +8,7 @@ import { GroupHeader } from './headers'
 import { StatusBadge } from './StatusBadge'
 import type { RowData, ColumnDef, GroupedSection } from '../types'
 import { asRecord } from '../lib/as-record'
+import { ACTIONS_COLUMN_ID } from '../actions'
 
 /** Resolve effective text alignment — currency/number default to right */
 function getAlign<T extends object>(col: ColumnDef<T>): 'left' | 'center' | 'right' {
@@ -91,6 +92,7 @@ export function Content<T extends object = RowData>({
   const visibleColumns = columnState.visibleColumns
     .map((id) => columns.find((c) => c.id === id))
     .filter((c): c is ColumnDef<T> => c !== undefined)
+    .concat(columns.filter((column) => column.id === ACTIONS_COLUMN_ID))
 
   const hasAttachments = attachmentAdapter !== null
   const extraColSpan = hasAttachments ? 1 : 0
@@ -310,15 +312,16 @@ export function Content<T extends object = RowData>({
                 ) : (
                   col.headerRender ? col.headerRender() : col.label
                 )}
-                {/* Drag handle on the column's right edge */}
-                <span
-                  role="separator"
-                  aria-orientation="vertical"
-                  onMouseDown={(e) => startResize(e, col.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  title="Drag to resize"
-                  className="absolute top-0 right-0 z-10 h-full w-1.5 cursor-col-resize select-none hover:bg-dt-primary/50"
-                />
+                {col.id !== ACTIONS_COLUMN_ID && (
+                  <span
+                    role="separator"
+                    aria-orientation="vertical"
+                    onMouseDown={(e) => startResize(e, col.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Drag to resize"
+                    className="absolute top-0 right-0 z-10 h-full w-1.5 cursor-col-resize select-none hover:bg-dt-primary/50"
+                  />
+                )}
               </TableHead>
             )
           })}
