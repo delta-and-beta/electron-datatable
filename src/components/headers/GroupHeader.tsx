@@ -1,7 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useLayoutEffect } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { formatAggregateValue } from '../../lib/format-aggregate'
+import { groupBg, groupRail } from './group-style'
 import type { ColumnDef } from '../../types'
 
 /* ---------------------------------------------------------------------------
@@ -31,19 +32,20 @@ export interface GroupHeaderProps {
   renderCell?: (column: ColumnDef, value: unknown) => React.ReactNode
   /** Extra columns prepended before user columns (e.g., attachment column) */
   extraColSpan?: number
+  /** Reports the measured header-row height so ancestors can stack sticky offsets */
+  onHeightChange?: (level: number, height: number) => void
 }
 
 /* ---------------------------------------------------------------------------
  * Helpers
  * --------------------------------------------------------------------------- */
 
-/** Walk up the DOM to find the nearest scrollable ancestor */
-function findScrollParent(el: HTMLElement): HTMLElement | null {
+/** Nearest ancestor that establishes the sticky scrollport (overflow-y not visible) */
+function findStickyRoot(el: HTMLElement): HTMLElement | null {
   let current = el.parentElement
   while (current) {
-    const style = getComputedStyle(current)
-    const overflow = style.overflow || style.overflowY
-    if (overflow === 'auto' || overflow === 'scroll') {
+    const overflowY = getComputedStyle(current).overflowY
+    if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'hidden' || overflowY === 'overlay') {
       return current
     }
     current = current.parentElement
@@ -61,27 +63,17 @@ function getAlign(col: ColumnDef): 'left' | 'center' | 'right' {
   return col.align ?? ((col.type === 'currency' || col.type === 'number') ? 'right' : 'left')
 }
 
-/** Level-tinted group-header background — strongest at the top level, lighter when nested.
- *  Higher-contrast tints so grouped rows stand out clearly from data rows. */
-function groupBg(level: number, stuck: boolean): string {
-  const tint = level <= 0 ? 32 : level === 1 ? 21 : 13
-  const base = stuck ? 'var(--dt-bg, #14142a)' : 'var(--dt-bg-secondary, #1f2937)'
-  return `color-mix(in srgb, var(--dt-primary, #6366f1) ${tint}%, ${base})`
-}
-
-/** Left accent-bar colour for a group row — fades with depth. */
-function groupAccent(level: number): string {
-  const alpha = level <= 0 ? 90 : level === 1 ? 55 : 30
-  return `color-mix(in srgb, var(--dt-primary, #6366f1) ${alpha}%, transparent)`
-}
-
 /* ---------------------------------------------------------------------------
  * GroupHeader
  *
  * Renders two <tr> elements:
  *   1. An invisible sentinel row used to detect when the header becomes sticky.
- *   2. The visible sticky header row that changes appearance when "stuck"
- *      and animates a push-up effect when the next group header approaches.
+ *   2. The visible sticky header row. The label band spans the leading run of
+ *      non-aggregatable columns; the disclosure control is a real <button>
+ *      inside the first cell so the row keeps its table semantics.
+ *
+ * The sticky `top` is owned exclusively by the positioning effect (never set
+ * from JSX), so React re-renders cannot clobber the push-up offset.
  * --------------------------------------------------------------------------- */
 
 export function GroupHeader({
@@ -96,188 +88,220 @@ export function GroupHeader({
   stickyOffset = 39,
   renderCell,
   extraColSpan = 0,
+  onHeightChange,
 }: GroupHeaderProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
-  const headerRef = useRef<HTMLTableRowElement>(null)
   const cellRef = useRef<HTMLTableRowElement>(null)
   const isStuckRef = useRef(false)
+  const positionRef = useRef<(() => void) | null>(null)
   const [isStuck, setIsStuck] = useState(false)
 
   useEffect(() => {
     const sentinel = sentinelRef.current
-    const header = headerRef.current
-    if (!sentinel || !header) return
+    const row = cellRef.current
+    if (!sentinel || !row) return
 
-    const scrollParent = findScrollParent(sentinel)
-    if (!scrollParent) return
-
+    const stickyRoot = findStickyRoot(sentinel)
     let rafId: number | null = null
+
+    function applyTop(top: number) {
+      if (!row) return
+      row.style.top = `${top}px`
+      row.querySelectorAll<HTMLTableCellElement>('td').forEach((cell) => {
+        cell.style.top = `${top}px`
+      })
+    }
+
+    function position() {
+      if (!sentinel || !row) return
+
+      const containerTop = stickyRoot ? stickyRoot.getBoundingClientRect().top : 0
+      const sentinelRect = sentinel.getBoundingClientRect()
+      const topThreshold = containerTop + stickyOffset
+
+      // Only update React state on transitions to avoid re-renders
+      const stuck = sentinelRect.top < topThreshold
+      if (isStuckRef.current !== stuck) {
+        isStuckRef.current = stuck
+        setIsStuck(stuck)
+      }
+
+      if (stuck) {
+        // Push-up: only a following header at the same or a shallower level
+        // displaces this one — deeper (child) headers stack below it instead.
+        const scope = stickyRoot ?? document
+        const allSentinels = Array.from(
+          scope.querySelectorAll<HTMLElement>('[data-group-sentinel]')
+        )
+        const myIndex = allSentinels.indexOf(sentinel)
+        let nextSentinel: HTMLElement | undefined
+        if (myIndex >= 0) {
+          for (let i = myIndex + 1; i < allSentinels.length; i++) {
+            const lv = Number(allSentinels[i].dataset.groupSentinel)
+            if (!Number.isNaN(lv) && lv <= level) {
+              nextSentinel = allSentinels[i]
+              break
+            }
+          }
+        }
+
+        if (nextSentinel) {
+          const nextRect = nextSentinel.getBoundingClientRect()
+          const headerHeight = row.getBoundingClientRect().height
+          const overlap = topThreshold + headerHeight - nextRect.top
+          applyTop(overlap > 0 ? stickyOffset - overlap : stickyOffset)
+        } else {
+          applyTop(stickyOffset)
+        }
+      } else {
+        applyTop(stickyOffset)
+      }
+    }
+
+    positionRef.current = position
 
     function onScroll() {
       if (rafId !== null) return
       rafId = requestAnimationFrame(() => {
         rafId = null
-        if (!sentinel || !header) return
-
-        const containerRect = scrollParent!.getBoundingClientRect()
-        const sentinelRect = sentinel.getBoundingClientRect()
-        const topThreshold = containerRect.top + stickyOffset
-
-        // Only update React state on transitions to avoid re-renders
-        const stuck = sentinelRect.top < topThreshold
-        if (isStuckRef.current !== stuck) {
-          isStuckRef.current = stuck
-          setIsStuck(stuck)
-        }
-
-        // Push-up: use cellRef (the visible <tr>) to get all <td>s
-        const row = cellRef.current
-        if (!row) return
-        const cells = row.querySelectorAll<HTMLTableCellElement>('td')
-        if (cells.length === 0) return
-
-        if (stuck) {
-          // Find the next group sentinel using indexOf (bulletproof)
-          const allSentinels = Array.from(
-            scrollParent!.querySelectorAll<HTMLElement>('[data-group-sentinel]')
-          )
-          const myIndex = allSentinels.indexOf(sentinel)
-          const nextSentinel = myIndex >= 0 ? allSentinels[myIndex + 1] : undefined
-
-          if (nextSentinel) {
-            const nextRect = nextSentinel.getBoundingClientRect()
-            const headerHeight = row.getBoundingClientRect().height
-            const overlap = topThreshold + headerHeight - nextRect.top
-
-            const top = overlap > 0 ? stickyOffset - overlap : stickyOffset
-            row.style.top = `${top}px`
-            cells.forEach((cell) => {
-              cell.style.top = `${top}px`
-            })
-          } else {
-            row.style.top = `${stickyOffset}px`
-            cells.forEach((cell) => {
-              cell.style.top = `${stickyOffset}px`
-            })
-          }
-        } else {
-          row.style.top = `${stickyOffset}px`
-          cells.forEach((cell) => {
-            cell.style.top = `${stickyOffset}px`
-          })
-        }
+        position()
       })
     }
 
-    scrollParent.addEventListener('scroll', onScroll, { passive: true })
-    // Run once to set initial state
-    onScroll()
+    // Capture-phase listener on window sees scroll events from every
+    // scroll container (scroll events don't bubble), so the handler works
+    // no matter which ancestor actually scrolls.
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true })
+    position()
 
     return () => {
-      scrollParent.removeEventListener('scroll', onScroll)
+      window.removeEventListener('scroll', onScroll, { capture: true } as EventListenerOptions)
+      positionRef.current = null
       if (rafId !== null) {
         cancelAnimationFrame(rafId)
       }
     }
-  }, [stickyOffset])
+  }, [stickyOffset, level])
 
-  // Reduced indentation, more vertical breathing room, and level-aware shading.
-  const paddingLeft = 12 + level * 14
+  // Reposition after every commit — collapse/expand and data changes move
+  // rows without firing a scroll event, which would leave stale offsets.
+  useEffect(() => {
+    positionRef.current?.()
+  })
+
+  // Report measured height so Content can stack deeper levels' sticky offsets.
+  useLayoutEffect(() => {
+    if (!onHeightChange || !cellRef.current) return
+    const height = cellRef.current.getBoundingClientRect().height
+    if (height > 0) onHeightChange(level, height)
+  })
+
+  // Indent is added on top of the 16px cell baseline; deeper levels step by 14px.
+  const paddingLeft = 16 + level * 14
   const padY = level <= 0 ? 8 : 6
   const bgColor = groupBg(level, isStuck)
-  const accentColor = groupAccent(level)
+  const railShadow = groupRail(level)
+
+  // The label band spans the leading run of non-aggregatable columns so the
+  // group label and count are not imprisoned in column 1's width. At least
+  // one column is always reserved for the label.
+  const firstAggregatable = columns.findIndex((c) => isAggregatable(c))
+  const leadSpan = firstAggregatable === -1 ? Math.max(columns.length, 1) : Math.max(firstAggregatable, 1)
+
+  const sumsSummary = columns
+    .filter((c) => isAggregatable(c) && sums[c.id] !== undefined)
+    .map((c) => `${c.label} total ${formatAggregateValue(c, sums[c.id])}`)
+    .join(', ')
+
+  const ariaLabel = `${fieldLabel}: ${groupKey}, ${count} record${count === 1 ? '' : 's'}${
+    sumsSummary ? `, ${sumsSummary}` : ''
+  }, ${isCollapsed ? 'collapsed' : 'expanded'}`
 
   return (
     <>
-      {/* Sentinel row — invisible, used for sticky detection */}
-      <tr
-        ref={headerRef}
-        aria-hidden="true"
-        style={{ height: 0, padding: 0, border: 'none' }}
-      >
+      {/* Sentinel row — invisible, used for sticky detection; tagged with its
+          level so push-up can ignore deeper (stacking) headers */}
+      <tr aria-hidden="true" style={{ height: 0, padding: 0, border: 'none' }}>
         <td colSpan={columns.length + extraColSpan} style={{ height: 0, padding: 0, border: 'none' }}>
-          <div ref={sentinelRef} data-group-sentinel="" style={{ height: 0 }} />
+          <div ref={sentinelRef} data-group-sentinel={level} style={{ height: 0 }} />
         </td>
       </tr>
 
-      {/* Visible sticky header row */}
+      {/* Visible sticky header row. Shallower levels get a higher z-index so
+          a child header pushed up past its parent slides underneath the
+          parent band (all below the thead's z-20). */}
       <tr
         ref={cellRef}
-        className={cn(
-          'group/header sticky z-10 cursor-pointer',
-        )}
-        style={{ top: stickyOffset }}
-        role="button"
-        tabIndex={0}
-        aria-expanded={!isCollapsed}
-        aria-label={`${fieldLabel}: ${groupKey}, ${count} records, ${isCollapsed ? 'collapsed' : 'expanded'}`}
+        className="group/header sticky cursor-pointer"
+        style={{ zIndex: 12 - Math.min(level, 2) }}
         onClick={onToggle}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onToggle()
-          }
-        }}
       >
         {extraColSpan > 0 && (
           <td
             key="__extra"
             className={cn('sticky border-b border-r border-dt-border transition-colors duration-150')}
-            style={{ top: stickyOffset, width: '50px', backgroundColor: bgColor, paddingTop: padY, paddingBottom: padY }}
+            style={{
+              backgroundColor: bgColor,
+              paddingTop: padY,
+              paddingBottom: padY,
+              boxShadow: railShadow,
+            }}
           />
         )}
-        {columns.map((col, idx) => {
-          const isFirst = idx === 0
 
-          // The first cell is always reserved for the group label (chevron +
-          // badge + key + count), even if the underlying column is aggregatable.
-          if (isFirst) {
-            return (
-              <td
-                key={col.id}
-                className={cn(
-                  'sticky pr-3 border-b border-dt-border transition-colors duration-150',
-                  idx < columns.length - 1 && 'border-r border-dt-border',
-                )}
-                style={{
-                  top: stickyOffset,
-                  paddingLeft,
-                  paddingTop: padY,
-                  paddingBottom: padY,
-                  width: col.width,
-                  backgroundColor: bgColor,
-                  boxShadow: `inset 3px 0 0 0 ${accentColor}`,
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  {/* Collapse/expand chevron */}
-                  <span className="flex-shrink-0 text-dt-muted">
-                    {isCollapsed ? (
-                      <ChevronRight className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                  </span>
+        {/* Label band — chevron + field name over value pill + count */}
+        <td
+          colSpan={leadSpan}
+          className={cn(
+            'sticky pr-3 border-b border-dt-border transition-colors duration-150',
+            leadSpan < columns.length && 'border-r border-dt-border',
+          )}
+          style={{
+            paddingLeft,
+            paddingTop: padY,
+            paddingBottom: padY,
+            backgroundColor: bgColor,
+            ...(extraColSpan === 0 ? { boxShadow: railShadow } : {}),
+          }}
+        >
+          <button
+            type="button"
+            aria-expanded={!isCollapsed}
+            aria-label={ariaLabel}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggle()
+            }}
+            className="flex min-w-0 max-w-full cursor-pointer items-center gap-2 border-none bg-transparent p-0 text-left"
+          >
+            {/* Collapse/expand chevron */}
+            <span className="flex-shrink-0 text-dt-muted">
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </span>
 
-                  {/* Grouped field name on top, value wrapped as a pill below */}
-                  <span className="flex min-w-0 flex-col items-start gap-0.5">
-                    <span className="text-[10px] font-medium uppercase tracking-wider leading-none text-dt-muted">
-                      {fieldLabel}
-                    </span>
-                    <span className="inline-block max-w-full truncate rounded-full border border-dt-border bg-[var(--dt-bg,#14142a)] px-2.5 py-0.5 text-sm font-semibold leading-tight text-dt-text">
-                      {groupKey}
-                    </span>
-                  </span>
+            {/* Grouped field name on top; value pill + count below */}
+            <span className="flex min-w-0 flex-col items-start gap-0.5">
+              <span className="text-[10px] font-medium uppercase tracking-wider leading-none text-dt-muted">
+                {fieldLabel}
+              </span>
+              <span className="flex min-w-0 max-w-full items-center gap-1.5">
+                <span className="inline-block min-w-0 truncate rounded-full border border-dt-border bg-[var(--dt-bg,#14142a)] px-2.5 py-0.5 text-sm font-semibold leading-tight text-dt-text">
+                  {groupKey}
+                </span>
+                <span className="flex-shrink-0 text-xs font-medium tabular-nums text-dt-muted">
+                  {count}
+                </span>
+              </span>
+            </span>
+          </button>
+        </td>
 
-                  {/* Record count — plain number at the right edge of the first column */}
-                  <span className="ml-auto flex-shrink-0 text-xs font-medium tabular-nums text-dt-muted">
-                    {count}
-                  </span>
-                </div>
-              </td>
-            )
-          }
-
+        {columns.slice(leadSpan).map((col, j) => {
+          const idx = leadSpan + j
           const align = getAlign(col)
 
           if (isAggregatable(col) && sums[col.id] !== undefined) {
@@ -294,8 +318,6 @@ export function GroupHeader({
                   idx < columns.length - 1 && 'border-r border-dt-border',
                 )}
                 style={{
-                  top: stickyOffset,
-                  width: col.width,
                   backgroundColor: bgColor,
                   paddingTop: padY,
                   paddingBottom: padY,
@@ -321,8 +343,6 @@ export function GroupHeader({
                 idx < columns.length - 1 && 'border-r border-dt-border',
               )}
               style={{
-                top: stickyOffset,
-                width: col.width,
                 backgroundColor: bgColor,
                 paddingTop: padY,
                 paddingBottom: padY,

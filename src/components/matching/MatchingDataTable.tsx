@@ -32,7 +32,7 @@ export function MatchingDataTable<T extends RowData>({
 
   return (
     <MatchingProvider value={matching}>
-      <div className={cn('relative', className)} {...matching.dropHandlers}>
+      <div className={cn('relative h-full', className)} {...matching.dropHandlers}>
         <DataTable {...dataTableProps} attachmentAdapter={attachmentAdapter} />
         <BulkDropZone />
         <MatchingReportDialog wrapper={matchingDialogWrapper} />

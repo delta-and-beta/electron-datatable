@@ -21,6 +21,7 @@ export interface DataTableContextValue<T extends RowData = RowData> {
 
   // Columns
   columns: ColumnDef<T>[]
+  filterColumns: ColumnDef<T>[]
   columnState: ReturnType<typeof useColumns<T>>
 
   // Group-by
@@ -37,6 +38,7 @@ export interface DataTableContextValue<T extends RowData = RowData> {
   attachmentAdapter: AttachmentAdapter | null
   attachmentCounts: Record<string, number>
   refreshAttachmentCounts: () => void
+  onAttachmentClick: ((rowId: string, event: React.MouseEvent) => void) | null
 
   // Config
   rowKey: string

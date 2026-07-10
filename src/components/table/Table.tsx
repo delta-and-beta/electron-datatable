@@ -13,7 +13,9 @@ const Table = React.forwardRef<
   <table
     ref={ref}
     className={cn(
-      'w-full caption-bottom text-sm',
+      // Fixed layout: column widths come from the <colgroup> alone, so header,
+      // data, and group rows can never disagree about a column's width.
+      'w-full table-fixed caption-bottom text-sm',
       // Column grid: vertical borders on every cell (data, header, group), last column excluded
       '[&_td]:border-r [&_td]:border-dt-border [&_th]:border-r [&_th]:border-dt-border [&_tr>:last-child]:border-r-0',
       className,
@@ -62,7 +64,7 @@ const TableFooter = React.forwardRef<
   <tfoot
     ref={ref}
     className={cn(
-      'border-t bg-dt-bg-secondary/50 font-medium [&>tr]:last:border-b-0',
+      'border-t bg-[var(--dt-bg-secondary)] font-medium [&>tr]:last:border-b-0',
       className
     )}
     {...props}
@@ -81,7 +83,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      'border-b border-dt-border transition-colors hover:bg-dt-bg-secondary/50 data-[state=selected]:bg-dt-bg-secondary',
+      'border-b border-dt-border transition-colors hover:bg-[var(--dt-bg-secondary)] data-[state=selected]:bg-[var(--dt-bg-secondary)]',
       className
     )}
     {...props}

@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { RowData, ColumnDef, GroupLevel, GroupConfig, GroupedSection } from '../types'
 import { groupRecords } from '../lib/group-by'
+import { joinGroupPath } from '../lib/group-path'
 
 const MAX_LEVELS = 3
 
@@ -160,7 +161,7 @@ export function useGroupBy<T extends RowData>({
     const allPaths = new Set<string>()
     function collectPaths(sections: GroupedSection[], prefix: string) {
       for (const section of sections) {
-        const path = prefix ? `${prefix}/${section.key}` : section.key
+        const path = joinGroupPath(prefix, section.key)
         allPaths.add(path)
         if (section.subgroups.length > 0) {
           collectPaths(section.subgroups, path)

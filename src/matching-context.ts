@@ -28,8 +28,11 @@ export interface UseMatchingReturn {
   }
 
   // Row-level attachment
+  dropTargetRowId: string | null
   getRowDropHandlers: (rowId: string) => {
+    onDragEnter: (e: React.DragEvent) => void
     onDragOver: (e: React.DragEvent) => void
+    onDragLeave: (e: React.DragEvent) => void
     onDrop: (e: React.DragEvent) => void
   }
 

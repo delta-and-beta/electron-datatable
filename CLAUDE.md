@@ -12,7 +12,10 @@ npm test               # vitest run (all tests, single run)
 npm run test:watch     # vitest (interactive watch mode)
 npm run lint           # eslint src/
 npx vitest run src/lib/group-by.test.ts   # Run a single test file
+node e2e/test-e2e.mjs  # Screenshot-based E2E (standalone Electron app, separate node_modules)
 ```
+
+`npm run dev` rebuilds JS/TS only — CSS is not watched, so re-run `npm run build` after touching Tailwind utilities or theme tokens.
 
 ## Package Overview
 
@@ -41,34 +44,47 @@ Three render modes:
 
 Data flows through hooks in this order inside `DataTable`:
 1. **useFilter** — condition-based filtering with nested AND/OR groups → `filter.filteredData`
-2. **useSearch** — free-text search across searchable columns (150ms debounce) → `search.filteredData`
-3. **useSort** — sorts search results → `sort.sortedData`
-4. **useColumns** — manages column visibility/order (does not transform data)
-5. **useGroupBy** — groups sorted data into recursive `GroupedSection[]` tree → `groupBy.groupedData`
+2. **DateFilter (inline)** — `DataTable` applies the active `dateFilter` directly between filter and search (not its own hook) → date-filtered rows
+3. **useSearch** — free-text search across searchable columns (150ms debounce) → `search.filteredData`
+4. **useSort** — multi-field sort via `sortRecordsMulti` → `sort.sortedData`
+5. **useColumns** — manages column visibility, order, and **per-column widths** (does not transform data)
+6. **useGroupBy** — groups sorted data into recursive `GroupedSection[]` tree → `groupBy.groupedData`
 
 Each hook is independently importable for custom composition outside `DataTable`.
+
+The context value exposes both `columns` (visible, ordered columns for rendering) and `filterColumns` (the full column set used to build filter/group/sort UIs) — keep these distinct when adding context consumers.
 
 ### Pure Logic Layer (`src/lib/`)
 
 Framework-agnostic functions with zero dependencies:
 - `group-by.ts` — recursive multi-level grouping algorithm with date period bucketing and sum aggregation
 - `filter.ts` — condition-based filtering engine with nested groups and typed operators
-- `sort.ts` — locale-aware comparison with null-last semantics
+- `sort.ts` — locale-aware comparison with null-last semantics; `sortRecordsMulti` applies an ordered `SortLevel[]` (multi-field tie-breaking)
 - `search.ts` — case-insensitive substring search across columns
 - `format.ts` — Intl-based formatters for currency, dates, numbers
 - `format-aggregate.ts` — formatting for aggregation values in group headers
+- `ordinal-vocabularies.ts` — built-in ordered vocabularies (weekdays, months, sizes, etc.) used to auto-detect ordinal columns so group sections sort semantically rather than alphabetically
+- `matching-utils.ts` — `fileToBase64`, `filterByMimeType`, `DEFAULT_ACCEPTED_TYPES` (shared by the matching plugin; lives in core lib but only consumed via `/matching`)
 - `dev-warn.ts` — development-only console warnings (tree-shaken out of prod)
 - `utils.ts` — `cn()` utility combining `clsx` + `tailwind-merge` for class merging
+
+### Rendering Layer
+
+- `components/table/` — low-level table primitives (`Table`, `TableRow`, `TableHead`, `TableCell`, …), exported publicly. `Table` uses **`table-layout: fixed`**; column widths come exclusively from the `<colgroup>` that `Content` renders (never from per-cell width styles). The primitives also render the vertical **column grid borders** across header, data, and group rows; the last column is excluded so there is no trailing edge line.
+- `components/Content.tsx` — orchestrates row/group rendering on top of the table primitives. Grouped first-column indent is *added* to the 16px cell baseline (`16 + 24 + (levels − 1) × 14`), so grouping never shifts content left of the column header. Grouped rows carry a left accent rail (`headers/group-style.ts`) on their first rendered cell.
+- `components/headers/GroupHeader.tsx` — level-aware group header. The label band spans the leading run of non-aggregatable columns (colSpan); the disclosure is a real `<button>` in the first cell (sums included in its aria-label). Sticky positioning uses a window capture-phase scroll listener, level-tagged sentinels, and measured per-level heights (reported to `Content` via `onHeightChange`) so **nested headers stack below their ancestors** while scrolling; only a following header at the same or shallower level pushes a stuck header out.
+- **Resizable columns**: dragging a header cell's right edge (pointer events) calls `useColumns.setColumnWidth`; the width lands on the `<col>` element so all row layers follow, and persists per-table.
+- **Collapse paths** are `/`-joined with percent-escaped segments (`lib/group-path.ts`) so group values containing `/` can't collide.
 
 ### State Persistence
 
 Hooks (`useGroupBy`, `useColumns`, `useSort`, `useFilter`) persist their state to `localStorage` keyed by `storageKey` prop. They validate saved state against current column definitions on load (orphaned columns are removed).
 
 localStorage key patterns:
-- `{storageKey}-sort` — `{ field, direction }`
+- `{storageKey}-sort` — `SortLevel[]` (ordered array of `{ field, direction }`; multi-field)
 - `{storageKey}-filters` — `{ root, enabled }`
 - `{storageKey}-groupby` — `{ groups, collapsed, showEmpty }`
-- `{storageKey}-columns` — `{ visible, order }`
+- `{storageKey}-columns` — `{ visible, order, widths }` (`widths` is a `Record<columnId, px>`)
 
 ### Tailwind Integration
 
@@ -85,7 +101,7 @@ Key pieces:
 - `MatchingDataTable` — drop-in wrapper composing DataTable + BulkDropZone + MatchingReportDialog
 - `matchingDialogWrapper` prop — lets consumers wrap dialog content in their own shell (e.g., shadcn `<Dialog>`)
 - Matching state is session-only (no localStorage persistence). `reset()` clears everything.
-- Single-file row drops go directly to `AttachmentAdapter.add()`. Bulk drops (2+ files) trigger the matching flow.
+- `useMatching` also exposes `getRowDropHandlers(rowId)` (with `dropTargetRowId` for highlight): a **single** valid file dropped on a row goes straight to `AttachmentAdapter.add()`; **2+** files dropped on a row escalate into the bulk matching flow. The same single-vs-bulk rule applies to the full-table `BulkDropZone`.
 
 ### Build Outputs
 

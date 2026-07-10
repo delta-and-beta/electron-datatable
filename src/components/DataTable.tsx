@@ -1,7 +1,7 @@
 // Compound component root — wires together all hooks and provides context
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { RowData, DataTableProps } from '../types'
+import type { RowData, ColumnDef, DataTableProps } from '../types'
 import { DataTableProvider, useDataTable, type DataTableContextValue } from '../context'
 import { useGroupBy } from '../hooks/useGroupBy'
 import { useColumns } from '../hooks/useColumns'
@@ -35,15 +35,74 @@ function DataTableRoot<T extends RowData = RowData>({
   defaultGroupBy,
   onRowClick,
   onRowContextMenu,
+  onAttachmentClick,
   toolbarExtra,
   className,
   children,
 }: DataTableProps<T>) {
-  // Filter (condition-based)
-  const filter = useFilter({ data, columns, storageKey })
+  // Attachment counts (loaded early so filter can use them)
+  const [attachmentCounts, setAttachmentCounts] = useState<Record<string, number>>({})
 
-  // Search (free-text, on filtered data)
-  const search = useSearch({ data: filter.filteredData, columns })
+  const refreshAttachmentCounts = useCallback(() => {
+    if (!attachmentAdapter) return
+    const ids = data.map((row) => String(row[rowKey]))
+    if (ids.length === 0) return
+    attachmentAdapter.getCounts(ids).then(setAttachmentCounts).catch(() => {})
+  }, [attachmentAdapter, data, rowKey])
+
+  useEffect(() => {
+    refreshAttachmentCounts()
+  }, [refreshAttachmentCounts])
+
+  // Inject virtual __attachments column for filtering
+  const filterColumns = useMemo(() => {
+    if (!attachmentAdapter) return columns
+    const attachCol: ColumnDef<T> = {
+      id: '__attachments',
+      label: 'Attachments',
+      type: 'number',
+      filterable: true,
+      sortable: false,
+      searchable: false,
+      visible: false,
+    }
+    return [...columns, attachCol as ColumnDef<T>]
+  }, [columns, attachmentAdapter])
+
+  // Inject attachment counts into data rows for the filter to read
+  const dataWithAttachments = useMemo(() => {
+    if (!attachmentAdapter) return data
+    return data.map((row) => ({
+      ...row,
+      __attachments: attachmentCounts[String(row[rowKey])] ?? 0,
+    }))
+  }, [data, attachmentAdapter, attachmentCounts, rowKey])
+
+  // Filter (condition-based) — uses enriched data + columns
+  const filter = useFilter({ data: dataWithAttachments, columns: filterColumns, storageKey })
+
+  // Date filter
+  const [dateFilter, setDateFilter] = useState<{
+    field: string
+    start?: Date
+    end?: Date
+  } | null>(null)
+
+  const dateFilteredData = useMemo(() => {
+    if (!dateFilter || !dateFilter.field) return filter.filteredData
+    return filter.filteredData.filter((row) => {
+      const val = row[dateFilter.field]
+      if (val == null) return false
+      const d = new Date(val as string | number)
+      if (isNaN(d.getTime())) return false
+      if (dateFilter.start && d < dateFilter.start) return false
+      if (dateFilter.end && d > dateFilter.end) return false
+      return true
+    })
+  }, [filter.filteredData, dateFilter])
+
+  // Search (free-text, on date-filtered data)
+  const search = useSearch({ data: dateFilteredData, columns })
 
   // Sort
   const sort = useSort({
@@ -69,28 +128,6 @@ function DataTableRoot<T extends RowData = RowData>({
     defaultLevels: defaultGroupBy,
   })
 
-  // Date filter
-  const [dateFilter, setDateFilter] = useState<{
-    field: string
-    start?: Date
-    end?: Date
-  } | null>(null)
-
-  // Attachment counts
-  const [attachmentCounts, setAttachmentCounts] = useState<Record<string, number>>({})
-
-  const refreshAttachmentCounts = useCallback(() => {
-    if (!attachmentAdapter) return
-    const ids = data.map((row) => String(row[rowKey]))
-    if (ids.length === 0) return
-    attachmentAdapter.getCounts(ids).then(setAttachmentCounts).catch(() => {})
-  }, [attachmentAdapter, data, rowKey])
-
-  // Load attachment counts on mount and when data changes
-  useEffect(() => {
-    refreshAttachmentCounts()
-  }, [refreshAttachmentCounts])
-
   // Build context value
   const contextValue = useMemo<DataTableContextValue<T>>(
     () => ({
@@ -102,6 +139,7 @@ function DataTableRoot<T extends RowData = RowData>({
       setSearchQuery: search.setQuery,
       sort,
       columns,
+      filterColumns,
       columnState,
       groupBy,
       filter,
@@ -110,6 +148,7 @@ function DataTableRoot<T extends RowData = RowData>({
       attachmentAdapter: attachmentAdapter ?? null,
       attachmentCounts,
       refreshAttachmentCounts,
+      onAttachmentClick: onAttachmentClick ?? null,
       rowKey: rowKey as string,
       storageKey,
     }),
@@ -122,6 +161,7 @@ function DataTableRoot<T extends RowData = RowData>({
       search.setQuery,
       sort,
       columns,
+      filterColumns,
       columnState,
       groupBy,
       filter,
@@ -129,6 +169,7 @@ function DataTableRoot<T extends RowData = RowData>({
       attachmentAdapter,
       attachmentCounts,
       refreshAttachmentCounts,
+      onAttachmentClick,
       rowKey,
       storageKey,
     ],
@@ -220,14 +261,16 @@ function FullPresetToolbar({
   setFilterMenuOpen: (open: boolean) => void
   toolbarExtra?: React.ReactNode
 }) {
-  const { groupBy, filter, columns, sort } = useDataTable()
+  const { groupBy, filter, columns, sort, filterColumns } = useDataTable()
   const groupableColumns = columns.filter((c) => c.groupable !== false)
+  const dateColumn = columns.find((c) => c.type === 'date')
 
   return (
     <Toolbar>
       <Search className="w-80" />
       {toolbarExtra}
       <div className="flex items-center gap-3">
+        {dateColumn && <DateFilter field={dateColumn.id} />}
         <div className="relative">
           <FilterToolbarButton
             activeCount={filter.activeCount}
@@ -239,7 +282,7 @@ function FullPresetToolbar({
           {filterMenuOpen && (
             <FilterConfigPanel
               root={filter.root}
-              columns={columns}
+              columns={filterColumns}
               enabled={filter.enabled}
               onSetEnabled={filter.setEnabled}
               onAddCondition={filter.addCondition}

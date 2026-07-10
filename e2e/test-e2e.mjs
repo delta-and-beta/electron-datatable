@@ -103,7 +103,7 @@ try {
   // ── Test 3: Group headers present ──
 
   const groupResult = await Runtime.evaluate({
-    expression: `document.querySelectorAll('tr[role="button"][aria-expanded]').length`,
+    expression: `document.querySelectorAll('tbody button[aria-expanded]').length`,
     returnByValue: true,
   })
   const groupCount = groupResult.result.value
@@ -113,8 +113,8 @@ try {
 
   const categoryResult = await Runtime.evaluate({
     expression: `
-      Array.from(document.querySelectorAll('tr[role="button"] td'))
-        .map(td => td.textContent)
+      Array.from(document.querySelectorAll('tbody button[aria-expanded]'))
+        .map(btn => btn.closest('tr').textContent)
         .filter(t => t.includes('Grocery') || t.includes('Restaurants') || t.includes('Gas Stations'))
         .length
     `,
@@ -143,8 +143,8 @@ try {
 
   const sumResult = await Runtime.evaluate({
     expression: `
-      Array.from(document.querySelectorAll('tr[role="button"] td'))
-        .some(td => td.textContent.includes('$'))
+      Array.from(document.querySelectorAll('tbody button[aria-expanded]'))
+        .some(btn => btn.closest('tr').textContent.includes('$'))
     `,
     returnByValue: true,
   })

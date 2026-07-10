@@ -125,6 +125,7 @@ export interface DataTableProps<T extends RowData = RowData> {
   defaultGroupBy?: GroupLevel[]
   onRowClick?: (row: T) => void
   onRowContextMenu?: (row: T, event: React.MouseEvent) => void
+  onAttachmentClick?: (rowId: string, event: React.MouseEvent) => void
   toolbarExtra?: ReactNode
   className?: string
   children?: ReactNode

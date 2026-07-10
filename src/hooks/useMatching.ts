@@ -11,12 +11,13 @@ interface UseMatchingOptions<T extends RowData> {
   attachmentAdapter: AttachmentAdapter | null
   data: T[]
   acceptedTypes?: string[]
+  onRowAttachmentAdded?: () => void
 }
 
 export type { UseMatchingReturn }
 
 export function useMatching<T extends RowData>(options: UseMatchingOptions<T>): UseMatchingReturn {
-  const { matchingAdapter, attachmentAdapter, data, acceptedTypes = DEFAULT_ACCEPTED_TYPES } = options
+  const { matchingAdapter, attachmentAdapter, data, acceptedTypes = DEFAULT_ACCEPTED_TYPES, onRowAttachmentAdded } = options
   const enabled = matchingAdapter !== null && attachmentAdapter !== null
 
   const [state, _setState] = useState<MatchingState>('idle')
@@ -221,24 +222,56 @@ export function useMatching<T extends RowData>(options: UseMatchingOptions<T>): 
     setState('done')
   }, [attachmentAdapter, matches, selectedMatches, addLog, setState])
 
+  const [dropTargetRowId, setDropTargetRowId] = useState<string | null>(null)
+
   const getRowDropHandlers = useCallback((rowId: string) => ({
+    onDragEnter: (e: React.DragEvent) => {
+      if (!attachmentAdapter) return
+      if (e.dataTransfer.types.includes('Files')) {
+        e.preventDefault()
+        e.stopPropagation()
+        setDropTargetRowId(rowId)
+      }
+    },
     onDragOver: (e: React.DragEvent) => {
       if (!attachmentAdapter) return
+      if (e.dataTransfer.types.includes('Files')) {
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'copy'
+        setDropTargetRowId(rowId)
+      }
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!attachmentAdapter) return
       e.preventDefault()
-      e.dataTransfer.dropEffect = 'copy'
+      e.stopPropagation()
+      setDropTargetRowId(null)
     },
     onDrop: async (e: React.DragEvent) => {
       if (!attachmentAdapter) return
       e.preventDefault()
+      e.stopPropagation()
+      setDropTargetRowId(null)
+
       const files = Array.from(e.dataTransfer.files)
       const valid = filterByMimeType(files, acceptedTypes)
-      if (valid.length !== 1) return
 
-      const file = valid[0]
-      const dataBase64 = await fileToBase64(file)
-      await attachmentAdapter.add(rowId, file.name, file.type, dataBase64)
+      if (valid.length >= 2) {
+        // Multi-file: trigger bulk matching
+        startMatching(valid)
+        return
+      }
+
+      if (valid.length === 1) {
+        const file = valid[0]
+        const dataBase64 = await fileToBase64(file)
+        await attachmentAdapter.add(rowId, file.name, file.type, dataBase64)
+        // Signal that counts changed (Content.tsx will pick this up)
+        onRowAttachmentAdded?.()
+      }
     },
-  }), [attachmentAdapter, acceptedTypes])
+  }), [attachmentAdapter, acceptedTypes, startMatching, onRowAttachmentAdded])
 
   const dropHandlers = useMemo(() => ({
     onDragEnter: (e: React.DragEvent) => {
@@ -285,6 +318,7 @@ export function useMatching<T extends RowData>(options: UseMatchingOptions<T>): 
     reset,
     bulkDropVisible,
     dropHandlers,
+    dropTargetRowId,
     getRowDropHandlers,
     enabled,
   }

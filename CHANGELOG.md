@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.9] - 2026-07-07
+
+### Fixed
+
+- **Column widths are now single-sourced.** A `<colgroup>` (with `table-layout:
+  fixed`) drives every row layer — header, data rows, and group headers — so a
+  drag-resized width actually applies, including shrinking below a column's
+  defined `width`. Previously only the `<th>` received the resized width and
+  auto layout let the widest cell win.
+- **Grouped rows can no longer shift left of the grid.** First-column indent is
+  added on top of the 16px cell baseline (`16 + 24 + (levels − 1) × 14`), so
+  toggling group-by never moves cell content left of its column header.
+- **Collapse paths are escaped.** Group values containing `/` (e.g. `"N/A"`)
+  no longer collide with nested group paths. Previously-persisted collapse
+  state for such values re-opens once.
+- **Sticky group headers now bind to the real scroller.** Detection uses a
+  window capture-phase scroll listener and `overflow-y`-based scrollport
+  resolution, and the sticky `top` is owned solely by the positioning logic so
+  re-renders can't clobber the push-up offset. Positions also refresh after
+  collapse/expand, not just on scroll.
+- **Resize drag lifecycle.** Pointer events (mouse/touch/pen), and unmounting
+  mid-drag cleans up document listeners and body cursor styles.
+
+### Changed
+
+- **Stacked sticky group headers.** Nested group headers now stack below their
+  ancestors while scrolling (breadcrumb-style context); a stuck header is only
+  pushed out by the next header at the same or a shallower level.
+- **Group label band.** The group header's label cell spans the leading run of
+  non-aggregatable columns; the record count sits beside the value pill instead
+  of being squeezed against the first column's right edge.
+- **Containment rail.** The group accent now runs down the first cell of every
+  row in the group (and starts at the true left edge when the attachment
+  column is present), not just the header row.
+- **Accessibility.** The group row keeps native table semantics; the disclosure
+  is a real `<button>` (in the first cell) with `aria-expanded` and the
+  aggregate sums included in its accessible name.
+
 ## [0.1.8] - 2026-06-01
 
 ### Added

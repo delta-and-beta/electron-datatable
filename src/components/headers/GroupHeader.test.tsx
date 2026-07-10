@@ -38,7 +38,7 @@ function renderGroupHeader(overrides = {}) {
 describe('GroupHeader', () => {
   it('renders one td per column', () => {
     renderGroupHeader()
-    const visibleRow = screen.getByRole('button', { name: /Food/ })
+    const visibleRow = screen.getByRole('button', { name: /Food/ }).closest('tr')!
     const cells = visibleRow.querySelectorAll('td')
     expect(cells).toHaveLength(4)
   })
@@ -71,7 +71,7 @@ describe('GroupHeader', () => {
 
   it('leaves non-aggregatable cells empty', () => {
     renderGroupHeader()
-    const visibleRow = screen.getByRole('button', { name: /Food/ })
+    const visibleRow = screen.getByRole('button', { name: /Food/ }).closest('tr')!
     const cells = visibleRow.querySelectorAll('td')
     // Last cell (status, type=text) should be empty
     expect(cells[3].textContent).toBe('')
