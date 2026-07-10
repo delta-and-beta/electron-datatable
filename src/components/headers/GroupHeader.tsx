@@ -2,13 +2,13 @@ import React, { useRef, useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { formatAggregateValue } from '../../lib/format-aggregate'
-import type { ColumnDef } from '../../types'
+import type { RowData, ColumnDef } from '../../types'
 
 /* ---------------------------------------------------------------------------
  * Props
  * --------------------------------------------------------------------------- */
 
-export interface GroupHeaderProps {
+export interface GroupHeaderProps<T extends object = RowData> {
   /** Display text for the group (e.g., "2024-01", "Food") */
   groupKey: string
   /** Column label shown as a badge for subgroups */
@@ -18,7 +18,7 @@ export interface GroupHeaderProps {
   /** Number of records in this group */
   count: number
   /** Visible columns to render cells for */
-  columns: ColumnDef[]
+  columns: ColumnDef<T>[]
   /** Aggregated sums keyed by column id */
   sums: Record<string, number>
   /** Whether this group is collapsed */
@@ -28,7 +28,7 @@ export interface GroupHeaderProps {
   /** Pixel offset from the top for sticky positioning (default: 39 = thead height) */
   stickyOffset?: number
   /** Optional cell renderer matching Content's renderCell pipeline */
-  renderCell?: (column: ColumnDef, value: unknown) => React.ReactNode
+  renderCell?: (column: ColumnDef<T>, value: unknown) => React.ReactNode
   /** Extra columns prepended before user columns (e.g., attachment column) */
   extraColSpan?: number
 }
@@ -52,12 +52,12 @@ function findScrollParent(el: HTMLElement): HTMLElement | null {
 }
 
 /** Check whether a column should show an aggregated sum */
-function isAggregatable(col: ColumnDef): boolean {
+function isAggregatable<T extends object>(col: ColumnDef<T>): boolean {
   return (col.type === 'currency' || col.type === 'number') && col.sumInGroup !== false
 }
 
 /** Resolve effective text alignment — currency/number default to right */
-function getAlign(col: ColumnDef): 'left' | 'center' | 'right' {
+function getAlign<T extends object>(col: ColumnDef<T>): 'left' | 'center' | 'right' {
   return col.align ?? ((col.type === 'currency' || col.type === 'number') ? 'right' : 'left')
 }
 
@@ -84,7 +84,7 @@ function groupAccent(level: number): string {
  *      and animates a push-up effect when the next group header approaches.
  * --------------------------------------------------------------------------- */
 
-export function GroupHeader({
+export function GroupHeader<T extends object = RowData>({
   groupKey,
   fieldLabel,
   level,
@@ -96,7 +96,7 @@ export function GroupHeader({
   stickyOffset = 39,
   renderCell,
   extraColSpan = 0,
-}: GroupHeaderProps) {
+}: GroupHeaderProps<T>) {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLTableRowElement>(null)
   const cellRef = useRef<HTMLTableRowElement>(null)
@@ -304,7 +304,7 @@ export function GroupHeader({
                 {renderCell
                   ? renderCell(col, value)
                   : col.render
-                    ? col.render(value, {} as Record<string, unknown>)
+                    ? col.render(value, {} as T)
                     : formatAggregateValue(col, value)}
               </td>
             )

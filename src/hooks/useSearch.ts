@@ -1,14 +1,14 @@
 import { useState, useMemo, useCallback } from 'react'
-import type { RowData, ColumnDef } from '../types'
+import type { ColumnDef } from '../types'
 import { searchRecords } from '../lib/search'
 import { useDebounce } from './useDebounce'
 
-interface UseSearchOptions<T extends RowData> {
+interface UseSearchOptions<T extends object> {
   data: T[]
   columns: ColumnDef<T>[]
 }
 
-export function useSearch<T extends RowData>({ data, columns }: UseSearchOptions<T>) {
+export function useSearch<T extends object>({ data, columns }: UseSearchOptions<T>) {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebounce(query, 150)
 

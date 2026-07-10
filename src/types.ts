@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
 
-/** Any record shape — consumers define their own */
+/** @deprecated Use your domain row type directly instead */
 export type RowData = Record<string, unknown>
 
 /** Date bucketing period for group-by */
 export type DatePeriod = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
 /** Column definition — tells the table how to render and group each field */
-export interface ColumnDef<T extends RowData = RowData> {
+export interface ColumnDef<T extends object = RowData> {
   id: string
   label: string
   type: 'text' | 'number' | 'date' | 'currency' | 'custom'
@@ -52,15 +52,15 @@ export interface GroupConfig {
 }
 
 /** Result of grouping — recursive tree structure */
-export interface GroupedSection {
+export interface GroupedSection<T extends object = RowData> {
   key: string
   field: string
   fieldLabel: string
   level: number
   count: number
   sums: Record<string, number>
-  records: RowData[]
-  subgroups: GroupedSection[]
+  records: T[]
+  subgroups: GroupedSection<T>[]
 }
 
 /** Filter operators for text columns */
@@ -114,7 +114,7 @@ export interface Attachment {
 }
 
 /** Props for the root DataTable component */
-export interface DataTableProps<T extends RowData = RowData> {
+export interface DataTableProps<T extends object = RowData> {
   data: T[]
   columns: ColumnDef<T>[]
   rowKey: keyof T & string

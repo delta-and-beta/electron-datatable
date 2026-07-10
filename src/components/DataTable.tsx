@@ -24,7 +24,7 @@ import { DataTableErrorBoundary } from './ErrorBoundary'
 import { devWarn } from '../lib/dev-warn'
 import { cn } from '../lib/utils'
 
-function DataTableRoot<T extends RowData = RowData>({
+function DataTableRoot<T extends object = RowData>({
   data,
   columns,
   rowKey,
@@ -153,9 +153,9 @@ function DataTableRoot<T extends RowData = RowData>({
   if (preset === 'full' && !children) {
     return (
       <DataTableErrorBoundary>
-        <DataTableProvider value={contextValue as DataTableContextValue}>
+        <DataTableProvider value={contextValue}>
           <div className={cn('relative', className)}>
-            <FullPreset onRowClick={onRowClick as ((row: RowData) => void) | undefined} toolbarExtra={toolbarExtra} />
+            <FullPreset<T> onRowClick={onRowClick} toolbarExtra={toolbarExtra} />
           </div>
         </DataTableProvider>
       </DataTableErrorBoundary>
@@ -166,9 +166,9 @@ function DataTableRoot<T extends RowData = RowData>({
   if (preset === 'minimal' && !children) {
     return (
       <DataTableErrorBoundary>
-        <DataTableProvider value={contextValue as DataTableContextValue}>
+        <DataTableProvider value={contextValue}>
           <div className={cn('relative', className)}>
-            <Content onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
+            <Content<T> onRowClick={onRowClick} />
             <Footer />
           </div>
         </DataTableProvider>
@@ -178,7 +178,7 @@ function DataTableRoot<T extends RowData = RowData>({
 
   return (
     <DataTableErrorBoundary>
-      <DataTableProvider value={contextValue as DataTableContextValue}>
+      <DataTableProvider value={contextValue}>
         <div className={cn('relative', className)}>{children}</div>
       </DataTableProvider>
     </DataTableErrorBoundary>
@@ -186,7 +186,7 @@ function DataTableRoot<T extends RowData = RowData>({
 }
 
 /** Full preset layout: toolbar + content + footer */
-function FullPreset({ onRowClick, toolbarExtra }: { onRowClick?: (row: RowData) => void; toolbarExtra?: React.ReactNode }) {
+function FullPreset<T extends object>({ onRowClick, toolbarExtra }: { onRowClick?: (row: T) => void; toolbarExtra?: React.ReactNode }) {
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
 
@@ -200,7 +200,7 @@ function FullPreset({ onRowClick, toolbarExtra }: { onRowClick?: (row: RowData) 
         toolbarExtra={toolbarExtra}
       />
       <div className="overflow-auto h-full">
-        <Content stickyHeader onRowClick={onRowClick} />
+        <Content<T> stickyHeader onRowClick={onRowClick} />
         <Footer />
       </div>
     </>

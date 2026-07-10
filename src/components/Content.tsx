@@ -6,9 +6,10 @@ import { useDataTable } from '../context'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table'
 import { GroupHeader } from './headers'
 import type { RowData, ColumnDef, GroupedSection } from '../types'
+import { asRecord } from '../lib/as-record'
 
 /** Resolve effective text alignment — currency/number default to right */
-function getAlign(col: ColumnDef): 'left' | 'center' | 'right' {
+function getAlign<T extends object>(col: ColumnDef<T>): 'left' | 'center' | 'right' {
   return col.align ?? ((col.type === 'currency' || col.type === 'number') ? 'right' : 'left')
 }
 
@@ -16,22 +17,22 @@ function getAlign(col: ColumnDef): 'left' | 'center' | 'right' {
  * Props
  * --------------------------------------------------------------------------- */
 
-interface ContentProps {
+interface ContentProps<T extends object> {
   emptyMessage?: string
   stickyHeader?: boolean
-  rowClassName?: (row: RowData) => string | undefined
+  rowClassName?: (row: T) => string | undefined
   className?: string
-  renderCell?: (column: ColumnDef, value: unknown, row: RowData) => React.ReactNode
-  onRowClick?: (row: RowData) => void
+  renderCell?: (column: ColumnDef<T>, value: unknown, row: T) => React.ReactNode
+  onRowClick?: (row: T) => void
 }
 
 /* ---------------------------------------------------------------------------
  * Default cell rendering
  * --------------------------------------------------------------------------- */
 
-function defaultRenderCell(column: ColumnDef, value: unknown): React.ReactNode {
+function defaultRenderCell<T extends object>(column: ColumnDef<T>, value: unknown): React.ReactNode {
   if (column.render) {
-    return column.render(value, {} as RowData)
+    return column.render(value, {} as T)
   }
 
   if (column.format) {
@@ -57,20 +58,20 @@ function defaultRenderCell(column: ColumnDef, value: unknown): React.ReactNode {
  * Content
  * --------------------------------------------------------------------------- */
 
-export function Content({
+export function Content<T extends object = RowData>({
   emptyMessage = 'No records found',
   stickyHeader = true,
   rowClassName,
   className,
   renderCell,
   onRowClick,
-}: ContentProps) {
-  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey, attachmentAdapter, attachmentCounts } = useDataTable()
+}: ContentProps<T>) {
+  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey, attachmentAdapter, attachmentCounts } = useDataTable<T>()
 
   // Resolve visible columns in display order
   const visibleColumns = columnState.visibleColumns
     .map((id) => columns.find((c) => c.id === id))
-    .filter((c): c is ColumnDef => c !== undefined)
+    .filter((c): c is ColumnDef<T> => c !== undefined)
 
   const hasAttachments = attachmentAdapter !== null
   const extraColSpan = hasAttachments ? 1 : 0
@@ -87,21 +88,22 @@ export function Content({
 
   // Aggregate cell renderer — same pipeline as data cells but without a row
   const renderAggregateCell = renderCell
-    ? (col: ColumnDef, value: unknown) => renderCell(col, value, {} as RowData)
-    : (col: ColumnDef, value: unknown) => defaultRenderCell(col, value)
+    ? (col: ColumnDef<T>, value: unknown) => renderCell(col, value, {} as T)
+    : (col: ColumnDef<T>, value: unknown) => defaultRenderCell(col, value)
 
   /* -----------------------------------------------------------------------
    * Render a single data row
    * ----------------------------------------------------------------------- */
 
-  function renderRow(row: RowData, index: number) {
+  function renderRow(row: T, index: number) {
     const isClickable = !!onRowClick
-    const key = row[rowKey] != null ? String(row[rowKey]) : `row-${index}`
+    const record = asRecord(row)
+    const key = record[rowKey] != null ? String(record[rowKey]) : `row-${index}`
 
     return (
       <TableRow
         key={key}
-        data-row-id={row[rowKey] != null ? String(row[rowKey]) : undefined}
+        data-row-id={record[rowKey] != null ? String(record[rowKey]) : undefined}
         className={cn(
           isClickable && 'cursor-pointer',
           rowClassName?.(row),
@@ -122,10 +124,10 @@ export function Content({
       >
         {hasAttachments && (
           <TableCell key="__attachments" className="text-center" style={{ width: '50px' }}>
-            {(attachmentCounts[String(row[rowKey])] ?? 0) > 0 ? (
+            {(attachmentCounts[String(record[rowKey])] ?? 0) > 0 ? (
               <span className="flex items-center justify-center gap-0.5 text-dt-primary">
                 <Paperclip className="w-3.5 h-3.5" />
-                <span className="text-xs font-medium">{attachmentCounts[String(row[rowKey])]}</span>
+                <span className="text-xs font-medium">{attachmentCounts[String(record[rowKey])]}</span>
               </span>
             ) : (
               <Paperclip className="w-3.5 h-3.5 mx-auto text-dt-muted opacity-20" />
@@ -133,7 +135,7 @@ export function Content({
           </TableCell>
         )}
         {visibleColumns.map((col) => {
-          const value = row[col.id]
+          const value = record[col.id]
           const align = getAlign(col)
           const isFirstCol = col.id === visibleColumns[0]?.id
           return (
@@ -167,7 +169,7 @@ export function Content({
    * ----------------------------------------------------------------------- */
 
   function renderSubgroup(
-    section: GroupedSection,
+    section: GroupedSection<T>,
     parentPath: string,
   ): React.ReactNode {
     const path = parentPath ? `${parentPath}/${section.key}` : section.key
@@ -175,7 +177,7 @@ export function Content({
 
     return (
       <Fragment key={path}>
-        <GroupHeader
+        <GroupHeader<T>
           groupKey={section.key}
           fieldLabel={section.fieldLabel}
           level={section.level}
@@ -319,7 +321,7 @@ export function Content({
 
           return (
             <TableBody key={path}>
-              <GroupHeader
+              <GroupHeader<T>
                 groupKey={section.key}
                 fieldLabel={section.fieldLabel}
                 level={section.level}

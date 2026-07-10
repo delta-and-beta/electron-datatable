@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import type { RowData, ColumnDef, FilterGroup, FilterConfig, FilterCondition } from '../types'
+import type { ColumnDef, FilterGroup, FilterConfig, FilterCondition } from '../types'
 import { filterRecords, createEmptyGroup, createEmptyCondition, countConditions } from '../lib/filter'
 
 const MAX_DEPTH = 3
 
-interface UseFilterOptions<T extends RowData> {
+interface UseFilterOptions<T extends object> {
   data: T[]
   columns: ColumnDef<T>[]
   storageKey?: string
@@ -44,7 +44,7 @@ function validateFilterGroup(group: FilterGroup, validFields: Set<string>): Filt
   }
 }
 
-export function useFilter<T extends RowData>({
+export function useFilter<T extends object>({
   data,
   columns,
   storageKey,

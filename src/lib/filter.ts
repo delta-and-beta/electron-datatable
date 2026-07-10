@@ -1,4 +1,5 @@
-import type { RowData, ColumnDef, FilterOperator, FilterCondition, FilterGroup } from '../types'
+import type { ColumnDef, FilterOperator, FilterCondition, FilterGroup } from '../types'
+import { asRecord } from './as-record'
 
 let idCounter = 0
 
@@ -41,11 +42,11 @@ function isEmpty(value: unknown): boolean {
   return value === null || value === undefined || value === ''
 }
 
-function evaluateCondition(record: RowData, condition: FilterCondition, columns: ColumnDef[]): boolean {
+function evaluateCondition<T extends object>(record: T, condition: FilterCondition, columns: ColumnDef<T>[]): boolean {
   const column = columns.find((c) => c.id === condition.field)
   if (!column) return true
 
-  const rawValue = record[condition.field]
+  const rawValue = asRecord(record)[condition.field]
 
   if (condition.operator === 'is_empty') return isEmpty(rawValue)
   if (condition.operator === 'is_not_empty') return !isEmpty(rawValue)
@@ -136,7 +137,7 @@ function evaluateDateCondition(rawValue: unknown, condition: FilterCondition): b
   }
 }
 
-function evaluateGroup(record: RowData, group: FilterGroup, columns: ColumnDef[]): boolean {
+function evaluateGroup<T extends object>(record: T, group: FilterGroup, columns: ColumnDef<T>[]): boolean {
   const results: boolean[] = [
     ...group.conditions.map((c) => evaluateCondition(record, c, columns)),
     ...group.groups.map((g) => evaluateGroup(record, g, columns)),
@@ -147,11 +148,11 @@ function evaluateGroup(record: RowData, group: FilterGroup, columns: ColumnDef[]
   return group.conjunction === 'and' ? results.every(Boolean) : results.some(Boolean)
 }
 
-export function filterRecords<T extends RowData>(
+export function filterRecords<T extends object>(
   records: T[],
   root: FilterGroup,
   columns: ColumnDef<T>[],
 ): T[] {
   if (countConditions(root) === 0) return records
-  return records.filter((record) => evaluateGroup(record, root, columns as ColumnDef[]))
+  return records.filter((record) => evaluateGroup(record, root, columns))
 }

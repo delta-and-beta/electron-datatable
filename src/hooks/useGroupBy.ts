@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import type { RowData, ColumnDef, GroupLevel, GroupConfig, GroupedSection } from '../types'
+import type { ColumnDef, GroupLevel, GroupConfig, GroupedSection } from '../types'
 import { groupRecords } from '../lib/group-by'
 
 const MAX_LEVELS = 3
 
-interface UseGroupByOptions<T extends RowData> {
+interface UseGroupByOptions<T extends object> {
   data: T[]
   columns: ColumnDef<T>[]
   sumFields?: string[]
@@ -12,7 +12,7 @@ interface UseGroupByOptions<T extends RowData> {
   defaultLevels?: GroupLevel[]
 }
 
-export function useGroupBy<T extends RowData>({
+export function useGroupBy<T extends object>({
   data,
   columns,
   sumFields = [],
@@ -90,7 +90,7 @@ export function useGroupBy<T extends RowData>({
   }, [fullKey, levels, collapsed, showEmpty])
 
   // Compute grouped data
-  const groupedData = useMemo<GroupedSection[]>(() => {
+  const groupedData = useMemo<GroupedSection<T>[]>(() => {
     if (levels.length === 0) return []
     const sumFieldIds =
       sumFields.length > 0
@@ -158,7 +158,7 @@ export function useGroupBy<T extends RowData>({
 
   const collapseAll = useCallback(() => {
     const allPaths = new Set<string>()
-    function collectPaths(sections: GroupedSection[], prefix: string) {
+    function collectPaths(sections: GroupedSection<T>[], prefix: string) {
       for (const section of sections) {
         const path = prefix ? `${prefix}/${section.key}` : section.key
         allPaths.add(path)
