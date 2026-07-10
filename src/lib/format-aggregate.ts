@@ -7,7 +7,11 @@ export function formatAggregateValue<T extends object>(col: ColumnDef<T>, value:
 
   switch (col.type) {
     case 'currency':
-      return formatCurrency(value, col.currency)
+      return formatCurrency(value, col.currency, {
+        minorUnits: col.minorUnits,
+        decimalPlaces: col.decimalPlaces,
+        symbol: col.symbol,
+      })
     case 'number':
       return formatNumber(value)
     default:

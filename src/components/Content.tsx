@@ -47,7 +47,11 @@ function defaultRenderCell<T extends object>(column: ColumnDef<T>, value: unknow
     case 'number':
       return formatNumber(value as number)
     case 'currency':
-      return formatCurrency(value as number, column.currency)
+      return formatCurrency(value as number, column.currency, {
+        minorUnits: column.minorUnits,
+        decimalPlaces: column.decimalPlaces,
+        symbol: column.symbol,
+      })
     case 'text':
     default:
       return String(value)

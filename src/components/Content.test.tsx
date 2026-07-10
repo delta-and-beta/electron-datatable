@@ -43,4 +43,73 @@ describe('Content', () => {
     const colSpanValue = parseInt(emptyCell.getAttribute('colspan') ?? '0')
     expect(colSpanValue).toBeGreaterThanOrEqual(1)
   })
+
+  it('formats minor-units currency cells with a symbol override', () => {
+    const currencyColumns: ColumnDef[] = [
+      {
+        id: 'amount',
+        label: 'Amount',
+        type: 'currency',
+        minorUnits: true,
+        symbol: 'HK$',
+      },
+    ]
+
+    render(
+      <DataTable
+        columns={currencyColumns}
+        data={[{ id: '1', amount: 150000 }]}
+        rowKey="id"
+        preset="minimal"
+      />,
+    )
+
+    expect(screen.getByText('HK$1,500.00')).toBeInTheDocument()
+  })
+
+  it('formats zero-decimal currency cells with a symbol override', () => {
+    const currencyColumns: ColumnDef[] = [
+      {
+        id: 'amount',
+        label: 'Amount',
+        type: 'currency',
+        decimalPlaces: 0,
+        symbol: '¥',
+      },
+    ]
+
+    render(
+      <DataTable
+        columns={currencyColumns}
+        data={[{ id: '1', amount: 500 }]}
+        rowKey="id"
+        preset="minimal"
+      />,
+    )
+
+    expect(screen.getByText('¥500')).toBeInTheDocument()
+  })
+
+  it('renders the empty placeholder for null currency cells', () => {
+    const currencyColumns: ColumnDef[] = [
+      {
+        id: 'amount',
+        label: 'Amount',
+        type: 'currency',
+        minorUnits: true,
+        symbol: 'HK$',
+      },
+    ]
+
+    render(
+      <DataTable
+        columns={currencyColumns}
+        data={[{ id: '1', amount: null }]}
+        rowKey="id"
+        preset="minimal"
+      />,
+    )
+
+    expect(screen.getByText('-')).toBeInTheDocument()
+  })
 })

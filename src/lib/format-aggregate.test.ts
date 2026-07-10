@@ -36,6 +36,18 @@ describe('formatAggregateValue', () => {
     expect(result).toMatch(/\$|USD/)
   })
 
+  it('formats minor-units currency sums without double division', () => {
+    const col: ColumnDef = {
+      id: 'amt',
+      label: 'Amount',
+      type: 'currency',
+      minorUnits: true,
+      symbol: 'HK$',
+    }
+
+    expect(formatAggregateValue(col, 150000)).toBe('HK$1,500.00')
+  })
+
   it('formats number columns', () => {
     const col: ColumnDef = {
       id: 'qty',

@@ -1,11 +1,31 @@
 /** Format a number as currency */
-export function formatCurrency(value: number, currency: string = 'USD'): string {
+export function formatCurrency(
+  value: number,
+  currency: string = 'USD',
+  options: {
+    minorUnits?: boolean
+    decimalPlaces?: number
+    symbol?: string
+  } = {},
+): string {
+  const decimalPlaces = options.decimalPlaces ?? 2
+  const displayValue = options.minorUnits
+    ? value / 10 ** decimalPlaces
+    : value
+  const fractionDigits = {
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces,
+  }
+
+  if (options.symbol !== undefined) {
+    return `${options.symbol}${new Intl.NumberFormat(undefined, fractionDigits).format(displayValue)}`
+  }
+
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
+    ...fractionDigits,
+  }).format(displayValue)
 }
 
 /** Format a date string for display */

@@ -25,6 +25,7 @@ export { defineTable, defineColumns } from './defineTable'
 export { groupRecords, getGroupKey, getDatePeriodKey, sortGroups } from './lib/group-by'
 export { filterRecords, getOperatorsForColumnType, createEmptyCondition, createEmptyGroup, getFilterDepth, countConditions } from './lib/filter'
 export { formatAggregateValue } from './lib/format-aggregate'
+export { formatCurrency, formatDate, formatNumber } from './lib/format'
 export { sortRecords, sortRecordsMulti } from './lib/sort'
 export type { SortLevel } from './lib/sort'
 

@@ -35,6 +35,12 @@ export interface ColumnDef<T extends object = RowData> {
   // Formatting
   format?: (value: unknown) => string
   currency?: string
+  /** Value is stored in minor units (for example, cents) */
+  minorUnits?: boolean
+  /** Number of decimal places to display and use for minor-unit conversion */
+  decimalPlaces?: number
+  /** Literal currency symbol or prefix override */
+  symbol?: string
 }
 
 /** A single grouping level */
