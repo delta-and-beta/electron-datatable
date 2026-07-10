@@ -34,6 +34,12 @@ describe('compareValues', () => {
   it('handles empty string vs null', () => {
     expect(compareValues('', null, 'asc')).toBe(-1)
   })
+
+  it('sorts tag arrays by length and then first label', () => {
+    expect(compareValues(['Remote'], ['Finance', 'VIP'], 'asc')).toBeLessThan(0)
+    expect(compareValues(['Remote'], ['VIP'], 'asc')).toBeLessThan(0)
+    expect(compareValues(['Remote'], ['Finance', 'VIP'], 'desc')).toBeGreaterThan(0)
+  })
 })
 
 describe('sortRecords', () => {
@@ -72,5 +78,21 @@ describe('sortRecords', () => {
     ]
     const result = sortRecords(withNulls, 'name', 'asc')
     expect(result.map((r) => r.name)).toEqual(['Alice', 'Bob', null])
+  })
+
+  it('sorts tags by array length and then first label', () => {
+    const withTags = [
+      { id: 'three', tags: ['Remote', 'VIP', 'Finance'] },
+      { id: 'vip', tags: ['VIP'] },
+      { id: 'finance', tags: ['Finance'] },
+      { id: 'two', tags: ['Remote', 'VIP'] },
+    ]
+
+    expect(sortRecords(withTags, 'tags', 'asc').map((row) => row.id)).toEqual([
+      'finance',
+      'vip',
+      'two',
+      'three',
+    ])
   })
 })

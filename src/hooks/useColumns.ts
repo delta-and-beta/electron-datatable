@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { RowData, ColumnDef } from '../types'
+import type { ColumnDef } from '../types'
 
-interface UseColumnsOptions<T extends RowData> {
+interface UseColumnsOptions<T extends object> {
   columns: ColumnDef<T>[]
   storageKey?: string
 }
@@ -12,7 +12,7 @@ interface ColumnState {
   widths: Record<string, number>
 }
 
-export function useColumns<T extends RowData>({ columns, storageKey }: UseColumnsOptions<T>) {
+export function useColumns<T extends object>({ columns, storageKey }: UseColumnsOptions<T>) {
   const fullKey = storageKey ? `${storageKey}-columns` : null
 
   const [state, setState] = useState<ColumnState>(() => {

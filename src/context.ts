@@ -1,16 +1,17 @@
 import { createContext, useContext } from 'react'
+import type { ProviderProps, ReactNode } from 'react'
 import type { RowData, ColumnDef, GroupedSection, AttachmentAdapter } from './types'
 import type { useGroupBy } from './hooks/useGroupBy'
 import type { useColumns } from './hooks/useColumns'
 import type { useSort } from './hooks/useSort'
 import type { useFilter } from './hooks/useFilter'
 
-export interface DataTableContextValue<T extends RowData = RowData> {
+export interface DataTableContextValue<T extends object = RowData> {
   // Data pipeline
   data: T[]
   filteredData: T[]
   sortedData: T[]
-  groupedData: GroupedSection[]
+  groupedData: GroupedSection<T>[]
 
   // Search
   searchQuery: string
@@ -45,12 +46,16 @@ export interface DataTableContextValue<T extends RowData = RowData> {
 
 const DataTableContext = createContext<DataTableContextValue | null>(null)
 
-export const DataTableProvider = DataTableContext.Provider
+type GenericDataTableProvider = <T extends object>(
+  props: ProviderProps<DataTableContextValue<T>>,
+) => ReactNode
 
-export function useDataTable<T extends RowData = RowData>(): DataTableContextValue<T> {
+export const DataTableProvider = DataTableContext.Provider as unknown as GenericDataTableProvider
+
+export function useDataTable<T extends object = RowData>(): DataTableContextValue<T> {
   const ctx = useContext(DataTableContext)
   if (!ctx) {
     throw new Error('useDataTable must be used within a <DataTable> component')
   }
-  return ctx as DataTableContextValue<T>
+  return ctx as unknown as DataTableContextValue<T>
 }

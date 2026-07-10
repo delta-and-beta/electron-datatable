@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import type { RowData, DataTableProps, AttachmentAdapter } from '../../types'
+import type { DataTableProps, AttachmentAdapter } from '../../types'
 import type { MatchingAdapter } from '../../matching-types'
 import { DataTable } from '../DataTable'
 import { MatchingProvider } from '../../matching-context'
@@ -8,14 +8,14 @@ import { BulkDropZone } from './BulkDropZone'
 import { MatchingReportDialog } from './MatchingReportDialog'
 import { cn } from '../../lib/utils'
 
-interface MatchingDataTableProps<T extends RowData> extends DataTableProps<T> {
+interface MatchingDataTableProps<T extends object> extends DataTableProps<T> {
   matchingAdapter?: MatchingAdapter<T>
   attachmentAdapter?: AttachmentAdapter
   matchingAcceptedTypes?: string[]
   matchingDialogWrapper?: (props: { open: boolean; onClose: () => void; children: ReactNode }) => ReactNode
 }
 
-export function MatchingDataTable<T extends RowData>({
+export function MatchingDataTable<T extends object>({
   matchingAdapter,
   attachmentAdapter,
   matchingAcceptedTypes,

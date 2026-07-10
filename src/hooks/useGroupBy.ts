@@ -1,10 +1,14 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import type { RowData, ColumnDef, GroupLevel, GroupConfig, GroupedSection } from '../types'
+import type { ColumnDef, GroupLevel, GroupConfig, GroupedSection } from '../types'
 import { groupRecords } from '../lib/group-by'
 
 const MAX_LEVELS = 3
 
-interface UseGroupByOptions<T extends RowData> {
+function isGroupable<T extends object>(column: ColumnDef<T>): boolean {
+  return column.groupable !== false && column.type !== 'tags'
+}
+
+interface UseGroupByOptions<T extends object> {
   data: T[]
   columns: ColumnDef<T>[]
   sumFields?: string[]
@@ -12,7 +16,7 @@ interface UseGroupByOptions<T extends RowData> {
   defaultLevels?: GroupLevel[]
 }
 
-export function useGroupBy<T extends RowData>({
+export function useGroupBy<T extends object>({
   data,
   columns,
   sumFields = [],
@@ -23,13 +27,14 @@ export function useGroupBy<T extends RowData>({
 
   // Load initial state from localStorage, falling back to defaultLevels
   const [levels, setLevels] = useState<GroupLevel[]>(() => {
+    const validFields = new Set(columns.filter(isGroupable).map((column) => column.id))
+    const tagFields = new Set(columns.filter((column) => column.type === 'tags').map((column) => column.id))
     if (fullKey) {
       try {
         const saved = localStorage.getItem(fullKey)
         if (saved) {
           const config = JSON.parse(saved)
           if (config && Array.isArray(config.groups)) {
-            const validFields = new Set(columns.filter((c) => c.groupable !== false).map((c) => c.id))
             return config.groups.filter(
               (g: unknown) => g && typeof g === 'object' && 'field' in g && typeof (g as GroupLevel).field === 'string' && validFields.has((g as GroupLevel).field)
             )
@@ -39,7 +44,7 @@ export function useGroupBy<T extends RowData>({
         // ignore
       }
     }
-    return defaultLevels
+    return defaultLevels.filter((level) => !tagFields.has(level.field))
   })
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
@@ -90,7 +95,7 @@ export function useGroupBy<T extends RowData>({
   }, [fullKey, levels, collapsed, showEmpty])
 
   // Compute grouped data
-  const groupedData = useMemo<GroupedSection[]>(() => {
+  const groupedData = useMemo<GroupedSection<T>[]>(() => {
     if (levels.length === 0) return []
     const sumFieldIds =
       sumFields.length > 0
@@ -108,6 +113,7 @@ export function useGroupBy<T extends RowData>({
         if (prev.length >= MAX_LEVELS) return prev
         if (prev.some((g) => g.field === field)) return prev
         const column = columns.find((c) => c.id === field)
+        if (column?.type === 'tags') return prev
         return [
           ...prev,
           {
@@ -126,8 +132,12 @@ export function useGroupBy<T extends RowData>({
   }, [])
 
   const updateGroup = useCallback((index: number, updates: Partial<GroupLevel>) => {
-    setLevels((prev) => prev.map((g, i) => (i === index ? { ...g, ...updates } : g)))
-  }, [])
+    setLevels((prev) => {
+      const column = updates.field ? columns.find((candidate) => candidate.id === updates.field) : undefined
+      if (column?.type === 'tags') return prev
+      return prev.map((g, i) => (i === index ? { ...g, ...updates } : g))
+    })
+  }, [columns])
 
   const reorderGroups = useCallback((fromIndex: number, toIndex: number) => {
     setLevels((prev) => {
@@ -158,7 +168,7 @@ export function useGroupBy<T extends RowData>({
 
   const collapseAll = useCallback(() => {
     const allPaths = new Set<string>()
-    function collectPaths(sections: GroupedSection[], prefix: string) {
+    function collectPaths(sections: GroupedSection<T>[], prefix: string) {
       for (const section of sections) {
         const path = prefix ? `${prefix}/${section.key}` : section.key
         allPaths.add(path)

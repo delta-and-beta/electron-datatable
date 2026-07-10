@@ -10,7 +10,7 @@ import { useSort } from '../hooks/useSort'
 import { useFilter } from '../hooks/useFilter'
 import { Toolbar } from './Toolbar'
 import { Content } from './Content'
-import { Footer } from './Footer'
+import { Footer, type FooterKpi } from './Footer'
 import { Search } from './toolbar/Search'
 import { GroupByToolbarButton } from './toolbar/GroupByToolbarButton'
 import { GroupByConfigPanel } from './toolbar/GroupByConfigPanel'
@@ -23,10 +23,13 @@ import { GroupHeader } from './headers/GroupHeader'
 import { DataTableErrorBoundary } from './ErrorBoundary'
 import { devWarn } from '../lib/dev-warn'
 import { cn } from '../lib/utils'
+import { ACTIONS_COLUMN_ID, makeActionsColumn } from '../actions'
+import { asRecord } from '../lib/as-record'
 
-function DataTableRoot<T extends RowData = RowData>({
+function DataTableRoot<T extends object = RowData>({
   data,
   columns,
+  actions,
   rowKey,
   storageKey = 'dt',
   preset = 'none',
@@ -36,14 +39,47 @@ function DataTableRoot<T extends RowData = RowData>({
   onRowClick,
   onRowContextMenu,
   toolbarExtra,
+  footerKpis,
   className,
   children,
 }: DataTableProps<T>) {
+  const tableColumns = useMemo(() => {
+    const columnsWithTagOptions = columns.map((column) => {
+      if (column.type !== 'tags' || column.options !== undefined) return column
+
+      const values = new Set<string>()
+      for (const row of data) {
+        const tags = asRecord(row)[column.id]
+        if (!Array.isArray(tags)) continue
+        for (const tag of tags) {
+          if (typeof tag === 'string') values.add(tag)
+        }
+      }
+
+      return {
+        ...column,
+        options: [...values].sort((a, b) => a.localeCompare(b, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        })),
+      }
+    })
+
+    return actions && actions.length > 0
+      ? [...columnsWithTagOptions, makeActionsColumn(actions)]
+      : columnsWithTagOptions
+  }, [actions, columns, data])
+
+  const configurableColumns = useMemo(
+    () => tableColumns.filter((column) => column.id !== ACTIONS_COLUMN_ID),
+    [tableColumns],
+  )
+
   // Filter (condition-based)
-  const filter = useFilter({ data, columns, storageKey })
+  const filter = useFilter({ data, columns: tableColumns, storageKey })
 
   // Search (free-text, on filtered data)
-  const search = useSearch({ data: filter.filteredData, columns })
+  const search = useSearch({ data: filter.filteredData, columns: tableColumns })
 
   // Sort
   const sort = useSort({
@@ -54,16 +90,16 @@ function DataTableRoot<T extends RowData = RowData>({
   })
 
   // Columns
-  const columnState = useColumns({ columns, storageKey })
+  const columnState = useColumns({ columns: configurableColumns, storageKey })
 
   // Group-by
-  const sumFields = columns
+  const sumFields = tableColumns
     .filter((c) => c.sumInGroup !== false && (c.type === 'number' || c.type === 'currency'))
     .map((c) => c.id)
 
   const groupBy = useGroupBy({
     data: sort.sortedData,
-    columns,
+    columns: tableColumns,
     sumFields,
     storageKey,
     defaultLevels: defaultGroupBy,
@@ -101,7 +137,7 @@ function DataTableRoot<T extends RowData = RowData>({
       searchQuery: search.query,
       setSearchQuery: search.setQuery,
       sort,
-      columns,
+      columns: tableColumns,
       columnState,
       groupBy,
       filter,
@@ -121,7 +157,7 @@ function DataTableRoot<T extends RowData = RowData>({
       search.query,
       search.setQuery,
       sort,
-      columns,
+      tableColumns,
       columnState,
       groupBy,
       filter,
@@ -136,14 +172,14 @@ function DataTableRoot<T extends RowData = RowData>({
 
   // Dev-mode config validation
   useEffect(() => {
-    devWarn(columns.length === 0, 'columns array is empty')
+    devWarn(tableColumns.length === 0, 'columns array is empty')
     devWarn(
       data.length > 0 && !(rowKey in data[0]),
       `rowKey "${rowKey}" not found on data items`,
     )
     devWarn(storageKey === '', 'storageKey is empty string, localStorage persistence disabled')
     devWarn(
-      !!defaultSort?.field && !columns.some((c) => c.id === defaultSort.field),
+      !!defaultSort?.field && !tableColumns.some((c) => c.id === defaultSort.field),
       `defaultSort field "${defaultSort?.field}" not found in columns`,
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,9 +189,13 @@ function DataTableRoot<T extends RowData = RowData>({
   if (preset === 'full' && !children) {
     return (
       <DataTableErrorBoundary>
-        <DataTableProvider value={contextValue as DataTableContextValue}>
+        <DataTableProvider value={contextValue}>
           <div className={cn('relative', className)}>
-            <FullPreset onRowClick={onRowClick as ((row: RowData) => void) | undefined} toolbarExtra={toolbarExtra} />
+            <FullPreset<T>
+              onRowClick={onRowClick}
+              toolbarExtra={toolbarExtra}
+              footerKpis={footerKpis}
+            />
           </div>
         </DataTableProvider>
       </DataTableErrorBoundary>
@@ -166,10 +206,10 @@ function DataTableRoot<T extends RowData = RowData>({
   if (preset === 'minimal' && !children) {
     return (
       <DataTableErrorBoundary>
-        <DataTableProvider value={contextValue as DataTableContextValue}>
+        <DataTableProvider value={contextValue}>
           <div className={cn('relative', className)}>
-            <Content onRowClick={onRowClick as ((row: RowData) => void) | undefined} />
-            <Footer />
+            <Content<T> onRowClick={onRowClick} />
+            <Footer kpis={footerKpis} />
           </div>
         </DataTableProvider>
       </DataTableErrorBoundary>
@@ -178,7 +218,7 @@ function DataTableRoot<T extends RowData = RowData>({
 
   return (
     <DataTableErrorBoundary>
-      <DataTableProvider value={contextValue as DataTableContextValue}>
+      <DataTableProvider value={contextValue}>
         <div className={cn('relative', className)}>{children}</div>
       </DataTableProvider>
     </DataTableErrorBoundary>
@@ -186,7 +226,15 @@ function DataTableRoot<T extends RowData = RowData>({
 }
 
 /** Full preset layout: toolbar + content + footer */
-function FullPreset({ onRowClick, toolbarExtra }: { onRowClick?: (row: RowData) => void; toolbarExtra?: React.ReactNode }) {
+function FullPreset<T extends object>({
+  onRowClick,
+  toolbarExtra,
+  footerKpis,
+}: {
+  onRowClick?: (row: T) => void
+  toolbarExtra?: React.ReactNode
+  footerKpis?: FooterKpi[]
+}) {
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
 
@@ -200,8 +248,8 @@ function FullPreset({ onRowClick, toolbarExtra }: { onRowClick?: (row: RowData) 
         toolbarExtra={toolbarExtra}
       />
       <div className="overflow-auto h-full">
-        <Content stickyHeader onRowClick={onRowClick} />
-        <Footer />
+        <Content<T> stickyHeader onRowClick={onRowClick} />
+        <Footer kpis={footerKpis} />
       </div>
     </>
   )
@@ -221,7 +269,7 @@ function FullPresetToolbar({
   toolbarExtra?: React.ReactNode
 }) {
   const { groupBy, filter, columns, sort } = useDataTable()
-  const groupableColumns = columns.filter((c) => c.groupable !== false)
+  const groupableColumns = columns.filter((c) => c.groupable !== false && c.type !== 'tags')
 
   return (
     <Toolbar>

@@ -1,7 +1,8 @@
-import type { RowData, ColumnDef } from '../types'
+import type { ColumnDef } from '../types'
+import { asRecord } from './as-record'
 
 /** Filter records by a search query across searchable columns */
-export function searchRecords<T extends RowData>(
+export function searchRecords<T extends object>(
   records: T[],
   query: string,
   columns: ColumnDef<T>[],
@@ -23,7 +24,7 @@ export function searchRecords<T extends RowData>(
 
   return records.filter((record) =>
     fields.some((field) => {
-      const value = record[field]
+      const value = asRecord(record)[field]
       if (value == null) return false
       return String(value).toLowerCase().includes(trimmed)
     }),

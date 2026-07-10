@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-07-11
+
+Consumer-lessons release — upstreams the patterns every company-app tab was
+hand-rolling (see company-app docs/superpowers/specs/2026-07-10-datatable-upstream-design.md).
+
+### Added
+
+- **Plain-object row generics.** `DataTable`/`defineTable` accept any `T extends object` —
+  the `as unknown as (T & RowData)[]` consumer cast is gone; `onRowClick(row: T)` is domain-typed.
+- **Minor-units currency columns.** `type:'currency'` columns take `minorUnits`,
+  `decimalPlaces`, `symbol`; body cells auto-format; `formatCurrency`/`formatNumber`/`formatDate` exported.
+- **StatusBadge + declarative badge columns.** Exported `StatusBadge`, `BadgeVariant`
+  union, and `ColumnDef.badgeVariants` value→variant maps.
+- **First-class row actions.** `actions: RowAction<T>[]` on `DataTable`/`defineTable`
+  (plus `makeActionsColumn`) — right-aligned icon buttons with stopPropagation and per-row `show`.
+- **Tags columns.** `type:'tags'` for `string[]` values: pill rendering, `contains_any` /
+  `contains_all` / `is_empty` filtering with a multi-select filter UI.
+- **KPI footer tiles.** `footerKpis: FooterKpi[]` renders label/value tiles in the footer bar.
+
+### Fixed
+
+- Ship working alpha-tinted `dt-*` backgrounds, borders, hover states, and muted text.
+- Accept plain-object row generics from the `/matching` entry point.
+- Keep consumer `actions` columns configurable and distinct from generated row actions.
+- Normalize currency decimal places to an integer from 0 through 20.
+- Prevent group updates from selecting non-groupable tags columns.
+- Place negative signs before custom currency symbols.
+- Use tabular numerals for number and currency body cells.
+
 ## [0.1.8] - 2026-06-01
 
 ### Added

@@ -1,22 +1,40 @@
 import type { ReactNode } from 'react'
+import type { BadgeVariant } from './components/StatusBadge'
+import type { FooterKpi } from './components/Footer'
 
-/** Any record shape — consumers define their own */
+/** @deprecated Use your domain row type directly instead */
 export type RowData = Record<string, unknown>
+
+/** An icon-button action rendered for each table row */
+export type RowAction<T extends object> = {
+  key: string
+  title: string
+  icon?: ReactNode
+  onClick: (row: T) => void
+  show?: (row: T) => boolean
+  variant?: 'default' | 'danger'
+}
 
 /** Date bucketing period for group-by */
 export type DatePeriod = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
 /** Column definition — tells the table how to render and group each field */
-export interface ColumnDef<T extends RowData = RowData> {
+export interface ColumnDef<T extends object = RowData> {
   id: string
   label: string
-  type: 'text' | 'number' | 'date' | 'currency' | 'custom'
+  /**
+   * `tags` values are `string[]`. Consumers with object arrays should map them
+   * to labels in their accessor or `render`. Tags sort by array length, then
+   * first label, and cannot be grouped.
+   */
+  type: 'text' | 'number' | 'date' | 'currency' | 'custom' | 'tags'
 
   // Display
   render?: (value: unknown, row: T) => ReactNode
   headerRender?: () => ReactNode
   width?: string
   align?: 'left' | 'center' | 'right'
+  badgeVariants?: Record<string, BadgeVariant>
 
   // Behavior
   sortable?: boolean
@@ -35,6 +53,12 @@ export interface ColumnDef<T extends RowData = RowData> {
   // Formatting
   format?: (value: unknown) => string
   currency?: string
+  /** Value is stored in minor units (for example, cents) */
+  minorUnits?: boolean
+  /** Number of decimal places to display and use for minor-unit conversion */
+  decimalPlaces?: number
+  /** Literal currency symbol or prefix override */
+  symbol?: string
 }
 
 /** A single grouping level */
@@ -52,15 +76,15 @@ export interface GroupConfig {
 }
 
 /** Result of grouping — recursive tree structure */
-export interface GroupedSection {
+export interface GroupedSection<T extends object = RowData> {
   key: string
   field: string
   fieldLabel: string
   level: number
   count: number
   sums: Record<string, number>
-  records: RowData[]
-  subgroups: GroupedSection[]
+  records: T[]
+  subgroups: GroupedSection<T>[]
 }
 
 /** Filter operators for text columns */
@@ -72,15 +96,18 @@ export type NumberOperator = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'is_em
 /** Filter operators for date columns */
 export type DateOperator = 'is' | 'is_before' | 'is_after' | 'is_on_or_before' | 'is_on_or_after' | 'is_empty' | 'is_not_empty'
 
+/** Filter operators for tags columns */
+export type TagsOperator = 'contains_any' | 'contains_all' | 'is_empty' | 'is_not_empty'
+
 /** Union of all filter operators */
-export type FilterOperator = TextOperator | NumberOperator | DateOperator
+export type FilterOperator = TextOperator | NumberOperator | DateOperator | TagsOperator
 
 /** A single filter condition: field + operator + value */
 export interface FilterCondition {
   id: string
   field: string
   operator: FilterOperator
-  value: string
+  value: string | string[]
 }
 
 /** A group of conditions joined by a single conjunction, with optional nested sub-groups */
@@ -114,9 +141,10 @@ export interface Attachment {
 }
 
 /** Props for the root DataTable component */
-export interface DataTableProps<T extends RowData = RowData> {
+export interface DataTableProps<T extends object = RowData> {
   data: T[]
   columns: ColumnDef<T>[]
+  actions?: RowAction<T>[]
   rowKey: keyof T & string
   storageKey?: string
   preset?: 'full' | 'minimal' | 'none'
@@ -126,6 +154,7 @@ export interface DataTableProps<T extends RowData = RowData> {
   onRowClick?: (row: T) => void
   onRowContextMenu?: (row: T, event: React.MouseEvent) => void
   toolbarExtra?: ReactNode
+  footerKpis?: FooterKpi[]
   className?: string
   children?: ReactNode
 }

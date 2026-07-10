@@ -1,6 +1,7 @@
 // Core types
 export type {
   RowData,
+  RowAction,
   ColumnDef,
   DatePeriod,
   GroupLevel,
@@ -12,6 +13,7 @@ export type {
   TextOperator,
   NumberOperator,
   DateOperator,
+  TagsOperator,
   FilterOperator,
   FilterCondition,
   FilterGroup,
@@ -20,11 +22,13 @@ export type {
 
 // Config helpers
 export { defineTable, defineColumns } from './defineTable'
+export { makeActionsColumn } from './actions'
 
 // Pure logic (framework-agnostic)
 export { groupRecords, getGroupKey, getDatePeriodKey, sortGroups } from './lib/group-by'
 export { filterRecords, getOperatorsForColumnType, createEmptyCondition, createEmptyGroup, getFilterDepth, countConditions } from './lib/filter'
 export { formatAggregateValue } from './lib/format-aggregate'
+export { formatCurrency, formatDate, formatNumber } from './lib/format'
 export { sortRecords, sortRecordsMulti } from './lib/sort'
 export type { SortLevel } from './lib/sort'
 
@@ -45,6 +49,7 @@ export { DataTable } from './components/DataTable'
 export { Content } from './components/Content'
 export { Toolbar } from './components/Toolbar'
 export { Footer } from './components/Footer'
+export type { FooterKpi } from './components/Footer'
 export { GroupByToolbarButton } from './components/toolbar/GroupByToolbarButton'
 export { GroupByConfigPanel } from './components/toolbar/GroupByConfigPanel'
 export { SortToolbarButton } from './components/toolbar/SortToolbarButton'
@@ -57,6 +62,8 @@ export { FilterToolbarButton } from './components/toolbar/FilterToolbarButton'
 export { FilterConfigPanel } from './components/toolbar/FilterConfigPanel'
 export { FilterConditionRow } from './components/toolbar/FilterConditionRow'
 export { GroupHeader } from './components/headers/GroupHeader'
+export { StatusBadge } from './components/StatusBadge'
+export type { BadgeVariant } from './components/StatusBadge'
 
 // Table primitives
 export {

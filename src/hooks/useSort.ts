@@ -1,8 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import type { RowData } from '../types'
 import { sortRecordsMulti, type SortLevel } from '../lib/sort'
 
-interface UseSortOptions<T extends RowData> {
+interface UseSortOptions<T extends object> {
   data: T[]
   defaultField?: string
   defaultDirection?: 'asc' | 'desc'
@@ -26,7 +25,7 @@ function parseStored(raw: string): SortLevel[] | null {
   }
 }
 
-export function useSort<T extends RowData>({
+export function useSort<T extends object>({
   data,
   defaultField,
   defaultDirection = 'asc',

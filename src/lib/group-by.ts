@@ -1,8 +1,9 @@
 // Pure grouping algorithm — zero dependencies
 // Extracted from hsbc-personal, made generic
 
-import type { RowData, GroupLevel, GroupedSection, DatePeriod } from '../types'
+import type { GroupLevel, GroupedSection, DatePeriod } from '../types'
 import { resolveOrdinalOrder } from './ordinal-vocabularies'
+import { asRecord } from './as-record'
 
 /** Minimal column info needed by the grouping algorithm */
 type GroupColumnInfo = { id: string; label: string }
@@ -64,13 +65,13 @@ export function sortGroups(keys: string[], direction: 'asc' | 'desc'): string[] 
 }
 
 /** Recursively group records through multiple group levels */
-export function groupRecords(
-  records: RowData[],
+export function groupRecords<T extends object>(
+  records: T[],
   levels: GroupLevel[],
   columns: GroupColumnInfo[],
   sumFields: string[] = [],
   currentLevel: number = 0,
-): GroupedSection[] {
+): GroupedSection<T>[] {
   if (levels.length === 0 || currentLevel >= levels.length) return []
 
   const level = levels[currentLevel]
@@ -78,10 +79,10 @@ export function groupRecords(
   const fieldLabel = column?.label ?? level.field
 
   // Bucket records by group key
-  const buckets = new Map<string, RowData[]>()
+  const buckets = new Map<string, T[]>()
 
   for (const record of records) {
-    const rawValue = record[level.field]
+    const rawValue = asRecord(record)[level.field]
     let key: string
 
     if (level.datePeriod && typeof rawValue === 'string') {
@@ -105,7 +106,7 @@ export function groupRecords(
     const sums: Record<string, number> = {}
     for (const field of sumFields) {
       sums[field] = groupRecordsArr.reduce((sum, r) => {
-        const val = Number(r[field])
+        const val = Number(asRecord(r)[field])
         return sum + (isNaN(val) ? 0 : val)
       }, 0)
     }

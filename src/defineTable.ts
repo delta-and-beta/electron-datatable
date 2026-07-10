@@ -1,13 +1,14 @@
-import type { RowData, ColumnDef, GroupLevel } from './types'
+import type { ColumnDef, GroupLevel, RowAction } from './types'
 
 /** Column definition using object key as field ID */
-type ColumnConfig<T extends RowData> = Omit<ColumnDef<T>, 'id'>
+type ColumnConfig<T extends object> = Omit<ColumnDef<T>, 'id'>
 
 /** Table configuration object */
-interface TableConfig<T extends RowData> {
+interface TableConfig<T extends object> {
   rowKey: keyof T & string
   storageKey?: string
   columns: { [K in keyof T]?: ColumnConfig<T> }
+  actions?: RowAction<T>[]
   defaults?: {
     sort?: { field: keyof T & string; direction: 'asc' | 'desc' }
     groupBy?: GroupLevel[]
@@ -15,8 +16,9 @@ interface TableConfig<T extends RowData> {
 }
 
 /** Return type — spread directly onto <DataTable> */
-interface TableDefinition<T extends RowData> {
+interface TableDefinition<T extends object> {
   columns: ColumnDef<T>[]
+  actions?: RowAction<T>[]
   rowKey: keyof T & string
   storageKey?: string
   defaultSort?: { field: string; direction: 'asc' | 'desc' }
@@ -40,13 +42,14 @@ interface TableDefinition<T extends RowData> {
  *
  * <DataTable {...table} data={invoices} preset="full" />
  */
-export function defineTable<T extends RowData>(config: TableConfig<T>): TableDefinition<T> {
+export function defineTable<T extends object>(config: TableConfig<T>): TableDefinition<T> {
   const columns: ColumnDef<T>[] = Object.entries(config.columns).map(
     ([id, col]) => ({ id, ...(col as ColumnConfig<T>) }),
   )
 
   return {
     columns,
+    actions: config.actions,
     rowKey: config.rowKey,
     storageKey: config.storageKey,
     defaultSort: config.defaults?.sort
@@ -66,6 +69,6 @@ export function defineTable<T extends RowData>(config: TableConfig<T>): TableDef
  *   { id: 'amount', label: 'Amount', type: 'currency', currency: 'USD' },
  * ])
  */
-export function defineColumns<T extends RowData>(columns: ColumnDef<T>[]): ColumnDef<T>[] {
+export function defineColumns<T extends object>(columns: ColumnDef<T>[]): ColumnDef<T>[] {
   return columns
 }
