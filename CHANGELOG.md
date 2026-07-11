@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-07-11
+
+### Added
+
+- **Data sync layer** (`@delta-and-beta/electron-datatable/sync`). Airtable-style
+  one-way sync from external stores: `SyncAdapter` contract with dependency-
+  injected structural clients (no bundled drivers), `SyncEngine` with two-phase
+  `dryRun()`/`commit()`, upsert-by-externalId into a consumer-owned `SyncTarget`,
+  per-run results, progress reporting, and deletion policies. Adapters for
+  SQLite, PostgreSQL, DynamoDB, and BigQuery; `inferColumns()` maps source
+  schemas to column definitions; `SyncStatusChip`/`useSyncStatus` surface sync
+  state in the toolbar. Core never imports from `/sync` (boundary-tested).
+
 ## [0.7.0] - 2026-07-11
 
 ### Added
