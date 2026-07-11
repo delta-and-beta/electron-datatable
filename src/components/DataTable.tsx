@@ -1,6 +1,7 @@
 // Compound component root — wires together all hooks and provides context
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { LayoutGrid, List } from 'lucide-react'
 import type { RowData, DataTableProps } from '../types'
 import { DataTableProvider, useDataTable, type DataTableContextValue } from '../context'
 import { useGroupBy } from '../hooks/useGroupBy'
@@ -26,6 +27,7 @@ import { devWarn } from '../lib/dev-warn'
 import { cn } from '../lib/utils'
 import { ACTIONS_COLUMN_ID, makeActionsColumn } from '../actions'
 import { asRecord } from '../lib/as-record'
+import { KanbanBoard } from './KanbanBoard'
 
 function DataTableRoot<T extends object = RowData>({
   data,
@@ -38,6 +40,9 @@ function DataTableRoot<T extends object = RowData>({
   attachmentAdapter,
   defaultSort,
   defaultGroupBy,
+  kanban,
+  viewMode: controlledViewMode,
+  onViewModeChange,
   onRowClick,
   onRowContextMenu,
   toolbarExtra,
@@ -45,6 +50,30 @@ function DataTableRoot<T extends object = RowData>({
   className,
   children,
 }: DataTableProps<T>) {
+  const [uncontrolledViewMode, setUncontrolledViewMode] = useState<'table' | 'kanban'>(() => {
+    try {
+      const saved = localStorage.getItem(`${storageKey}-viewmode`)
+      return saved === 'kanban' || saved === 'table' ? saved : 'table'
+    } catch {
+      return 'table'
+    }
+  })
+  const viewMode = kanban ? controlledViewMode ?? uncontrolledViewMode : 'table'
+
+  useEffect(() => {
+    if (!kanban || controlledViewMode !== undefined) return
+    try {
+      localStorage.setItem(`${storageKey}-viewmode`, uncontrolledViewMode)
+    } catch {
+      // ignore quota errors
+    }
+  }, [controlledViewMode, kanban, storageKey, uncontrolledViewMode])
+
+  const setViewMode = useCallback((next: 'table' | 'kanban') => {
+    if (controlledViewMode === undefined) setUncontrolledViewMode(next)
+    onViewModeChange?.(next)
+  }, [controlledViewMode, onViewModeChange])
+
   const tableColumns = useMemo(() => {
     const columnsWithTagOptions = columns.map((column) => {
       if (column.type !== 'tags' || column.options !== undefined) return column
@@ -104,7 +133,14 @@ function DataTableRoot<T extends object = RowData>({
     columns: tableColumns,
     sumFields,
     storageKey,
-    defaultLevels: defaultGroupBy,
+    defaultLevels: defaultGroupBy && defaultGroupBy.length > 0
+      ? defaultGroupBy
+      : kanban?.laneField
+        ? [{ field: kanban.laneField, sort: 'asc' }]
+        : defaultGroupBy,
+    seedLevelWhenEmpty: kanban?.laneField
+      ? { field: kanban.laneField, sort: 'asc' }
+      : undefined,
   })
 
   // Date filter
@@ -150,6 +186,8 @@ function DataTableRoot<T extends object = RowData>({
       refreshAttachmentCounts,
       rowKey: rowKey as string,
       storageKey,
+      kanban,
+      onRowClick,
     }),
     [
       data,
@@ -169,6 +207,8 @@ function DataTableRoot<T extends object = RowData>({
       refreshAttachmentCounts,
       rowKey,
       storageKey,
+      kanban,
+      onRowClick,
     ],
   )
 
@@ -197,6 +237,9 @@ function DataTableRoot<T extends object = RowData>({
               onRowClick={onRowClick}
               toolbarExtra={toolbarExtra}
               footerKpis={footerKpis}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              hasKanban={kanban !== undefined}
             />
           </div>
         </DataTableProvider>
@@ -232,10 +275,16 @@ function FullPreset<T extends object>({
   onRowClick,
   toolbarExtra,
   footerKpis,
+  viewMode,
+  onViewModeChange,
+  hasKanban,
 }: {
   onRowClick?: (row: T) => void
   toolbarExtra?: React.ReactNode
   footerKpis?: FooterKpi[]
+  viewMode: 'table' | 'kanban'
+  onViewModeChange: (viewMode: 'table' | 'kanban') => void
+  hasKanban: boolean
 }) {
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
@@ -248,9 +297,12 @@ function FullPreset<T extends object>({
         filterMenuOpen={filterMenuOpen}
         setFilterMenuOpen={setFilterMenuOpen}
         toolbarExtra={toolbarExtra}
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        hasKanban={hasKanban}
       />
-      <div className="overflow-auto h-full">
-        <Content<T> stickyHeader onRowClick={onRowClick} />
+      <div className="h-full overflow-auto">
+        {viewMode === 'kanban' ? <KanbanBoard<T> /> : <Content<T> stickyHeader onRowClick={onRowClick} />}
         <Footer kpis={footerKpis} />
       </div>
     </>
@@ -263,12 +315,18 @@ function FullPresetToolbar({
   filterMenuOpen,
   setFilterMenuOpen,
   toolbarExtra,
+  viewMode,
+  onViewModeChange,
+  hasKanban,
 }: {
   groupMenuOpen: boolean
   setGroupMenuOpen: (open: boolean) => void
   filterMenuOpen: boolean
   setFilterMenuOpen: (open: boolean) => void
   toolbarExtra?: React.ReactNode
+  viewMode: 'table' | 'kanban'
+  onViewModeChange: (viewMode: 'table' | 'kanban') => void
+  hasKanban: boolean
 }) {
   const { groupBy, filter, columns, sort } = useDataTable()
   const groupableColumns = columns.filter((c) => c.groupable !== false && c.type !== 'tags')
@@ -278,6 +336,34 @@ function FullPresetToolbar({
       <Search className="w-80" />
       {toolbarExtra}
       <div className="flex items-center gap-3">
+        {hasKanban ? (
+          <div className="inline-flex items-center rounded-md border border-dt-border bg-dt-bg p-0.5">
+            <button
+              type="button"
+              aria-label="Table view"
+              aria-pressed={viewMode === 'table'}
+              onClick={() => onViewModeChange('table')}
+              className={cn(
+                'rounded p-1.5 text-dt-muted transition-colors hover:text-dt-text',
+                viewMode === 'table' && 'bg-dt-bg-secondary text-dt-text',
+              )}
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Board view"
+              aria-pressed={viewMode === 'kanban'}
+              onClick={() => onViewModeChange('kanban')}
+              className={cn(
+                'rounded p-1.5 text-dt-muted transition-colors hover:text-dt-text',
+                viewMode === 'kanban' && 'bg-dt-bg-secondary text-dt-text',
+              )}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
         <Popover
           open={filterMenuOpen}
           onOpenChange={setFilterMenuOpen}
@@ -349,4 +435,5 @@ export const DataTable = Object.assign(DataTableRoot, {
   Filter: FilterToolbarButton,
   FilterPanel: FilterConfigPanel,
   GroupHeader,
+  KanbanBoard,
 })

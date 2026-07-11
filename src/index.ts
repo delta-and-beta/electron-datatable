@@ -7,6 +7,7 @@ export type {
   GroupLevel,
   GroupConfig,
   GroupedSection,
+  KanbanConfig,
   AttachmentAdapter,
   Attachment,
   DataTableProps,
@@ -57,6 +58,7 @@ export { DataTable } from './components/DataTable'
 
 // Individual components (for custom composition)
 export { Content } from './components/Content'
+export { KanbanBoard } from './components/KanbanBoard'
 export { Toolbar } from './components/Toolbar'
 export { Footer } from './components/Footer'
 export type { FooterKpi } from './components/Footer'

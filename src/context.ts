@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { ProviderProps, ReactNode } from 'react'
-import type { RowData, ColumnDef, GroupedSection, AttachmentAdapter } from './types'
+import type { RowData, ColumnDef, GroupedSection, AttachmentAdapter, KanbanConfig } from './types'
 import type { useGroupBy } from './hooks/useGroupBy'
 import type { useColumns } from './hooks/useColumns'
 import type { useSort } from './hooks/useSort'
@@ -42,6 +42,8 @@ export interface DataTableContextValue<T extends object = RowData> {
   // Config
   rowKey: string
   storageKey: string
+  kanban?: KanbanConfig<T>
+  onRowClick?: (row: T) => void
 }
 
 const DataTableContext = createContext<DataTableContextValue | null>(null)

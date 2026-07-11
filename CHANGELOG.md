@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-07-11
+
+### Added
+
+- **Kanban view.** `KanbanBoard` compound component driven by the existing
+  group-by pipeline (first level = lanes), plus `viewMode: 'table' | 'kanban'`
+  on the full preset with a toolbar toggle and per-storageKey persistence.
+  `defineTable` gains a `kanban` config: `laneField` sugar, `laneOrder`,
+  card fields rendered through the column formatting pipeline, `laneAggregate`
+  (currency-aware), and optimistic `onMove` with rollback. Unmatched rows
+  appear in an "Uncategorized" lane. Native HTML5 drag & drop — no new deps.
+
 ## [0.4.0] - 2026-07-11
 
 ### Added
