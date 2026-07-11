@@ -31,6 +31,10 @@ export interface GroupHeaderProps<T extends object = RowData> {
   renderCell?: (column: ColumnDef<T>, value: unknown) => React.ReactNode
   /** Extra columns prepended before user columns (e.g., attachment column) */
   extraColSpan?: number
+  /** Whether a leading structural selection cell is present */
+  selectionEnabled?: boolean
+  /** Whether the structural selection cell is frozen */
+  selectionFrozen?: boolean
   /** Widths resolved from persisted resize state before static column widths */
   resolvedWidths?: Record<string, string | number | undefined>
   /** Sticky-left offsets keyed by frozen visible column id */
@@ -102,6 +106,8 @@ export function GroupHeader<T extends object = RowData>({
   stickyOffset = 39,
   renderCell,
   extraColSpan = 0,
+  selectionEnabled = false,
+  selectionFrozen = false,
   resolvedWidths = {},
   frozenOffsets = {},
   lastFrozenId,
@@ -228,7 +234,25 @@ export function GroupHeader<T extends object = RowData>({
           }
         }}
       >
-        {extraColSpan > 0 && (
+        {selectionEnabled && (
+          <td
+            key="__selection"
+            className={cn(
+              'sticky border-b border-r border-dt-border transition-colors duration-150',
+              selectionFrozen && 'dt-group-frozen-cell z-20',
+            )}
+            style={{
+              top: stickyOffset,
+              left: selectionFrozen ? 0 : undefined,
+              width: '44px',
+              minWidth: '44px',
+              backgroundColor: bgColor,
+              paddingTop: padY,
+              paddingBottom: padY,
+            }}
+          />
+        )}
+        {extraColSpan - (selectionEnabled ? 1 : 0) > 0 && (
           <td
             key="__extra"
             className={cn('sticky border-b border-r border-dt-border transition-colors duration-150')}

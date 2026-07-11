@@ -30,11 +30,14 @@ import { ACTIONS_COLUMN_ID, makeActionsColumn } from '../actions'
 import { asRecord } from '../lib/as-record'
 import { KanbanBoard } from './KanbanBoard'
 import { ViewsMenu } from './ViewsMenu'
+import { useBatchSelection } from '../hooks/useBatchSelection'
+import { BulkActionBar } from './BulkActionBar'
 
 function DataTableRoot<T extends object = RowData>({
   data,
   columns,
   actions,
+  bulkActions,
   rowKey,
   storageKey = 'dt',
   frozenColumns = 0,
@@ -167,6 +170,17 @@ function DataTableRoot<T extends object = RowData>({
       : undefined,
   })
 
+  const selection = useBatchSelection({
+    enabled: bulkActions !== undefined,
+    rows: sort.sortedData,
+    rowKey: rowKey as string,
+  })
+  const clearSelection = selection.clear
+
+  useEffect(() => {
+    clearSelection()
+  }, [clearSelection, filter.enabled, filter.root, search.query, viewMode])
+
   const views = useViews({
     storageKey,
     columns: columnState,
@@ -205,6 +219,7 @@ function DataTableRoot<T extends object = RowData>({
       filteredData: search.filteredData,
       sortedData: sort.sortedData,
       groupedData: groupBy.groupedData,
+      selection,
       searchQuery: search.query,
       setSearchQuery: search.setQuery,
       sort,
@@ -226,8 +241,7 @@ function DataTableRoot<T extends object = RowData>({
     [
       data,
       search.filteredData,
-      sort.sortedData,
-      groupBy.groupedData,
+      selection,
       search.query,
       search.setQuery,
       sort,
@@ -276,6 +290,7 @@ function DataTableRoot<T extends object = RowData>({
               onViewModeChange={setViewMode}
               hasKanban={kanban !== undefined}
             />
+            {bulkActions && viewMode === 'table' && <BulkActionBar<T> actions={bulkActions} />}
           </div>
         </DataTableProvider>
       </DataTableErrorBoundary>
@@ -290,6 +305,7 @@ function DataTableRoot<T extends object = RowData>({
           <div className={cn('relative', className)}>
             <Content<T> onRowClick={onRowClick} />
             <Footer kpis={footerKpis} />
+            {bulkActions && viewMode === 'table' && <BulkActionBar<T> actions={bulkActions} />}
           </div>
         </DataTableProvider>
       </DataTableErrorBoundary>
@@ -299,7 +315,10 @@ function DataTableRoot<T extends object = RowData>({
   return (
     <DataTableErrorBoundary>
       <DataTableProvider value={contextValue}>
-        <div className={cn('relative', className)}>{children}</div>
+        <div className={cn('relative', className)}>
+          {children}
+          {bulkActions && viewMode === 'table' && <BulkActionBar<T> actions={bulkActions} />}
+        </div>
       </DataTableProvider>
     </DataTableErrorBoundary>
   )

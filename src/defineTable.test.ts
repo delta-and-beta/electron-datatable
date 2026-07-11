@@ -7,6 +7,22 @@ interface Person {
 }
 
 describe('defineTable row actions', () => {
+  it('preserves bulk actions in the spreadable table definition', () => {
+    const bulkActions = [
+      { key: 'archive', title: 'Archive people', onClick: vi.fn<(rows: Person[]) => void>() },
+    ]
+
+    const table = defineTable<Person>({
+      rowKey: 'id',
+      columns: {
+        name: { label: 'Name', type: 'text' },
+      },
+      bulkActions,
+    })
+
+    expect(table.bulkActions).toBe(bulkActions)
+  })
+
   it('preserves actions in the spreadable table definition', () => {
     const actions = [
       { key: 'edit', title: 'Edit person', onClick: vi.fn<(row: Person) => void>() },

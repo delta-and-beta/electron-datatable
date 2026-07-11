@@ -6,6 +6,7 @@ import type { useColumns } from './hooks/useColumns'
 import type { useSort } from './hooks/useSort'
 import type { useFilter } from './hooks/useFilter'
 import type { useViews } from './hooks/useViews'
+import type { useBatchSelection } from './hooks/useBatchSelection'
 
 export interface DataTableContextValue<T extends object = RowData> {
   // Data pipeline
@@ -13,6 +14,9 @@ export interface DataTableContextValue<T extends object = RowData> {
   filteredData: T[]
   sortedData: T[]
   groupedData: GroupedSection<T>[]
+
+  // Optional table-only batch selection
+  selection: ReturnType<typeof useBatchSelection<T>>
 
   // Search
   searchQuery: string
