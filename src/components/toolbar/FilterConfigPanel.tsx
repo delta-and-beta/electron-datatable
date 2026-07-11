@@ -54,7 +54,7 @@ function FilterGroupView({
   const depthColors = [
     'border-gray-600',
     'border-blue-500/40',
-    'border-amber-500/40',
+    'border-dt-badge-warning/40',
   ]
   const borderColor = depthColors[depth - 1] ?? depthColors[0]
 

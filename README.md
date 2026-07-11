@@ -136,21 +136,74 @@ That's it. You get search, filtering, grouping, column toggle, and sorting out o
 
 ## Theming
 
-All colors flow through CSS custom properties. Override them globally or scope them per table.
+The base stylesheet provides dark defaults, so existing consumers need no
+theme attribute. Import both optional theme files to switch modes at runtime:
+
+```ts
+import '@delta-and-beta/electron-datatable/styles.css'
+import '@delta-and-beta/electron-datatable/themes/dark.css'
+import '@delta-and-beta/electron-datatable/themes/light.css'
+```
+
+Set `data-dt-theme="dark"` or `data-dt-theme="light"` on `<html>` or on any
+ancestor that should scope the theme. The closest scoped value wins.
 
 ### Tokens
 
-| Token | Dark | Light | Purpose |
-|-------|------|-------|---------|
-| `--dt-primary` | `#3b82f6` | `#3b82f6` | Buttons, active states |
-| `--dt-primary-hover` | `#2563eb` | `#2563eb` | Hover states |
-| `--dt-bg` | `#1a1a2e` | `#ffffff` | Table background |
-| `--dt-bg-secondary` | `#16213e` | `#f9fafb` | Alternating rows, panels |
-| `--dt-border` | `#374151` | `#e5e7eb` | Borders, dividers |
-| `--dt-text` | `#f3f4f6` | `#111827` | Primary text |
-| `--dt-muted` | `#9ca3af` | `#6b7280` | Secondary text, placeholders |
-| `--dt-positive` | `#22c55e` | `#16a34a` | Positive values |
-| `--dt-negative` | `#ef4444` | `#dc2626` | Negative values |
+| Token | Dark | Light | Semantic role |
+|-------|------|-------|---------------|
+| `--dt-primary` | `#3b82f6` | `#3b82f6` | Accent **FOREGROUND** for interactive text/icons; must contrast with `--dt-bg` |
+| `--dt-primary-hover` | `#2563eb` | `#2563eb` | Hover-state accent **FOREGROUND**; must contrast with `--dt-bg` |
+| `--dt-bg` | `#1a1a2e` | `#ffffff` | Primary table **BACKGROUND** |
+| `--dt-bg-secondary` | `#16213e` | `#f9fafb` | Secondary **BACKGROUND** for rows, panels, and grouped regions |
+| `--dt-border` | `#374151` | `#e5e7eb` | **BORDER** color for grid lines and dividers |
+| `--dt-text` | `#f3f4f6` | `#111827` | Primary text **FOREGROUND**; must contrast with table backgrounds |
+| `--dt-muted` | `#9ca3af` | `#6b7280` | Secondary text and placeholder **FOREGROUND** |
+| `--dt-positive` | `#22c55e` | `#16a34a` | Positive-value **FOREGROUND** |
+| `--dt-negative` | `#ef4444` | `#dc2626` | Negative-value **FOREGROUND** |
+| `--dt-badge-success` | `#22c55e` | `#15803d` | Success badge **FOREGROUND** |
+| `--dt-badge-warning` | `#f59e0b` | `#b45309` | Warning badge **FOREGROUND** |
+| `--dt-badge-error` | `#ef4444` | `#b91c1c` | Error badge **FOREGROUND** |
+| `--dt-badge-info` | `#3b82f6` | `#1d4ed8` | Informational badge **FOREGROUND** |
+| `--dt-badge-neutral` | `#9ca3af` | `#4b5563` | Neutral badge **FOREGROUND** |
+| `--dt-badge-purple` | `#a855f7` | `#7e22ce` | Purple badge **FOREGROUND** |
+| `--dt-badge-cyan` | `#06b6d4` | `#0e7490` | Cyan badge **FOREGROUND** |
+
+Badge backgrounds are derived from their foreground tokens with rules such as
+`color-mix(in srgb, var(--dt-badge-success) 10%, transparent)`.
+
+### Runtime helpers
+
+All helpers are exported from the package root. Token keys omit the `--dt-`
+prefix, and `applyDataTableTheme` returns a cleanup function that removes the
+inline variables it applied.
+
+```ts
+import {
+  applyDataTableTheme,
+  getDataTableThemeMode,
+  setDataTableThemeMode,
+} from '@delta-and-beta/electron-datatable'
+
+const cleanup = applyDataTableTheme({
+  primary: '#8b5cf6',
+  'badge-info': '#2563eb',
+})
+
+const toggleTheme = () => {
+  const next = getDataTableThemeMode() === 'light' ? 'dark' : 'light'
+  setDataTableThemeMode(next)
+}
+
+// Remove only the inline --dt-* values applied above when no longer needed.
+cleanup()
+```
+
+```tsx
+<button type="button" onClick={toggleTheme}>
+  Toggle dark/light table theme
+</button>
+```
 
 ### Using your own design system
 
@@ -165,7 +218,7 @@ Skip the theme files and map your existing tokens:
 }
 ```
 
-### Scoped themes
+### Custom scoped themes
 
 Apply different themes to different tables:
 

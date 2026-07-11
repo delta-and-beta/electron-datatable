@@ -1,4 +1,4 @@
-:root {
+[data-dt-theme='light'] {
   --dt-primary: #3b82f6;
   --dt-primary-hover: #2563eb;
   --dt-bg: #ffffff;
@@ -8,4 +8,11 @@
   --dt-muted: #6b7280;
   --dt-positive: #16a34a;
   --dt-negative: #dc2626;
+  --dt-badge-success: #15803d;
+  --dt-badge-warning: #b45309;
+  --dt-badge-error: #b91c1c;
+  --dt-badge-info: #1d4ed8;
+  --dt-badge-neutral: #4b5563;
+  --dt-badge-purple: #7e22ce;
+  --dt-badge-cyan: #0e7490;
 }

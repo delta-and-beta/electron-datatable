@@ -155,7 +155,10 @@ describe('Content', () => {
       />,
     )
 
-    expect(screen.getByText('active')).toHaveClass('bg-dt-positive/10', 'text-dt-positive')
+    expect(screen.getByText('active')).toHaveClass(
+      'bg-dt-badge-success/10',
+      'text-dt-badge-success',
+    )
   })
 
   it('falls back to a neutral badge for unmapped values', () => {
@@ -178,7 +181,10 @@ describe('Content', () => {
       />,
     )
 
-    expect(screen.getByText('paused')).toHaveClass('bg-dt-muted/10', 'text-dt-muted')
+    expect(screen.getByText('paused')).toHaveClass(
+      'bg-dt-badge-neutral/10',
+      'text-dt-badge-neutral',
+    )
   })
 
   it.each([null, ''])('renders the empty placeholder instead of a badge for %p', (status) => {
@@ -246,8 +252,14 @@ describe('Content', () => {
       />,
     )
 
-    expect(screen.getByText('Remote')).toHaveClass('bg-dt-muted/10', 'text-dt-muted')
-    expect(screen.getByText('VIP')).toHaveClass('bg-dt-muted/10', 'text-dt-muted')
+    expect(screen.getByText('Remote')).toHaveClass(
+      'bg-dt-badge-neutral/10',
+      'text-dt-badge-neutral',
+    )
+    expect(screen.getByText('VIP')).toHaveClass(
+      'bg-dt-badge-neutral/10',
+      'text-dt-badge-neutral',
+    )
   })
 
   it('renders the existing placeholder for an empty tags array', () => {

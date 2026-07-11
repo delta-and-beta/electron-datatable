@@ -4,13 +4,13 @@ import { StatusBadge, type BadgeVariant } from './StatusBadge'
 
 describe('StatusBadge', () => {
   it.each<[BadgeVariant, string, string]>([
-    ['success', 'bg-dt-positive/10', 'text-dt-positive'],
-    ['warning', 'bg-amber-500/10', 'text-amber-500'],
-    ['error', 'bg-dt-negative/10', 'text-dt-negative'],
-    ['info', 'bg-dt-primary/10', 'text-dt-primary'],
-    ['neutral', 'bg-dt-muted/10', 'text-dt-muted'],
-    ['purple', 'bg-purple-500/10', 'text-purple-500'],
-    ['cyan', 'bg-cyan-500/10', 'text-cyan-500'],
+    ['success', 'bg-dt-badge-success/10', 'text-dt-badge-success'],
+    ['warning', 'bg-dt-badge-warning/10', 'text-dt-badge-warning'],
+    ['error', 'bg-dt-badge-error/10', 'text-dt-badge-error'],
+    ['info', 'bg-dt-badge-info/10', 'text-dt-badge-info'],
+    ['neutral', 'bg-dt-badge-neutral/10', 'text-dt-badge-neutral'],
+    ['purple', 'bg-dt-badge-purple/10', 'text-dt-badge-purple'],
+    ['cyan', 'bg-dt-badge-cyan/10', 'text-dt-badge-cyan'],
   ])('renders the %s variant', (variant, backgroundClass, textClass) => {
     render(<StatusBadge variant={variant}>{variant}</StatusBadge>)
 
@@ -21,8 +21,8 @@ describe('StatusBadge', () => {
     render(<StatusBadge className="uppercase">Paused</StatusBadge>)
 
     expect(screen.getByText('Paused')).toHaveClass(
-      'bg-dt-muted/10',
-      'text-dt-muted',
+      'bg-dt-badge-neutral/10',
+      'text-dt-badge-neutral',
       'uppercase',
     )
   })
