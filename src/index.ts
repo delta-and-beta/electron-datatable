@@ -23,6 +23,16 @@ export type {
 // Config helpers
 export { defineTable, defineColumns } from './defineTable'
 export { makeActionsColumn } from './actions'
+export {
+  applyDataTableTheme,
+  setDataTableThemeMode,
+  getDataTableThemeMode,
+} from './theme'
+export type {
+  DtThemeToken,
+  DataTableThemeTokens,
+  DataTableThemeMode,
+} from './theme'
 
 // Pure logic (framework-agnostic)
 export { groupRecords, getGroupKey, getDatePeriodKey, sortGroups } from './lib/group-by'

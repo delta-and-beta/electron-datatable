@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-07-11
+
+### Added
+
+- **Theming API.** Export `DtThemeToken`, `DataTableThemeTokens`,
+  `applyDataTableTheme`, `setDataTableThemeMode`, and `getDataTableThemeMode`
+  for typed runtime skinning and dark/light mode selection.
+- **Badge palette tokens.** Status badge foregrounds and derived translucent
+  backgrounds now use seven independently configurable `--dt-badge-*` tokens.
+
+### Changed
+
+- Theme files now use `[data-dt-theme='dark']` and
+  `[data-dt-theme='light']` selectors so both modes can be imported together.
+  If you imported `themes/dark.css` and relied on `:root` scoping, set
+  `data-dt-theme='dark'` on `<html>` or rely on the built-in dark defaults.
+
 ## [0.2.0] - 2026-07-11
 
 Consumer-lessons release — upstreams the patterns every company-app tab was

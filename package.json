@@ -1,6 +1,6 @@
 {
   "name": "@delta-and-beta/electron-datatable",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A feature-rich, composable React data table with multi-level grouping, attachments, search, and column management",
   "type": "module",
   "main": "./dist/index.cjs",
