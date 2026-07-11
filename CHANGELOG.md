@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-07-11
+
+### Added
+
+- **Portaled `Popover` primitive.** All toolbar panels (Sort, Filter, Group,
+  Columns) now render through one portal-to-body popover with two-axis
+  collision handling: vertical flip, horizontal clamp, re-measure on
+  scroll/resize/content change, focus trap, and Esc-to-close. Long panels no
+  longer overflow the viewport or clip under ancestor `overflow`.
+- **Frozen leading columns.** `frozenColumns?: number` on `DataTable`/
+  `defineTable` pins the first N visible columns with cumulative sticky
+  offsets, opaque themed backgrounds, and a right-edge divider. The frozen
+  count persists with column state.
+
+### Fixed
+
+- Body cells now respect user-resized column widths (previously only headers
+  did), so column resize and sticky offsets stay aligned.
+
 ## [0.3.0] - 2026-07-11
 
 ### Added
