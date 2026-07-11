@@ -17,7 +17,7 @@ const people: Person[] = [
 ]
 
 const columns: ColumnDef<Person>[] = [
-  { id: 'name', label: 'Name', type: 'text' },
+  { id: 'name', label: 'Name', type: 'text', editable: true },
   { id: 'age', label: 'Age', type: 'number' },
 ]
 
@@ -53,6 +53,16 @@ describe('plain object row compatibility', () => {
         preset="minimal"
         bulkActions={bulkActions}
         onRowClick={(person) => person.name}
+        onCellEdit={(person, columnId, nextValue) => {
+          void person.id
+          void columnId.toUpperCase()
+          void nextValue
+        }}
+        onCellEditError={(error, person, columnId) => {
+          void error
+          void person.id
+          void columnId.toUpperCase()
+        }}
       />,
     )
 

@@ -53,6 +53,12 @@ export interface ColumnDef<T extends object = RowData> {
   searchable?: boolean
   visible?: boolean
   filterable?: boolean
+  /**
+   * Enables table-view inline editing when `DataTableProps.onCellEdit` is set.
+   * Ignored for columns with a custom `render`, because rendered output has no
+   * unambiguous inverse value.
+   */
+  editable?: boolean
   /** Predefined value choices (e.g. a single-select field). When set, the filter
    *  renders a value dropdown (Airtable-style) instead of a free-text input. */
   options?: Array<string | { value: string; label?: string }>
@@ -216,6 +222,16 @@ export interface DataTableProps<T extends object = RowData> {
   onViewModeChange?: (viewMode: 'table' | 'kanban') => void
   onRowClick?: (row: T) => void
   onRowContextMenu?: (row: T, event: React.MouseEvent) => void
+  /**
+   * Receives a typed inline cell value after an optimistic table-view commit.
+   * The table never mutates `row` or `data`: consumers must persist the value
+   * and provide refreshed `data`. The optimistic cell display is transient and
+   * is discarded on the next `data` prop reference change. A rejected promise
+   * reverts the display to the prior value and invokes `onCellEditError`.
+   */
+  onCellEdit?: (row: T, columnId: string, nextValue: unknown) => void | Promise<void>
+  /** Called after an async or synchronous `onCellEdit` failure. */
+  onCellEditError?: (error: unknown, row: T, columnId: string) => void
   toolbarExtra?: ReactNode
   footerKpis?: FooterKpi[]
   className?: string
