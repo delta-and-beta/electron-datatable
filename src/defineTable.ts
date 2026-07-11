@@ -1,4 +1,4 @@
-import type { ColumnDef, GroupLevel, RowAction } from './types'
+import type { ColumnDef, GroupLevel, KanbanConfig, RowAction } from './types'
 
 /** Column definition using object key as field ID */
 type ColumnConfig<T extends object> = Omit<ColumnDef<T>, 'id'>
@@ -10,6 +10,9 @@ interface TableConfig<T extends object> {
   frozenColumns?: number
   columns: { [K in keyof T]?: ColumnConfig<T> }
   actions?: RowAction<T>[]
+  kanban?: KanbanConfig<T>
+  viewMode?: 'table' | 'kanban'
+  onViewModeChange?: (viewMode: 'table' | 'kanban') => void
   defaults?: {
     sort?: { field: keyof T & string; direction: 'asc' | 'desc' }
     groupBy?: GroupLevel[]
@@ -20,6 +23,9 @@ interface TableConfig<T extends object> {
 interface TableDefinition<T extends object> {
   columns: ColumnDef<T>[]
   actions?: RowAction<T>[]
+  kanban?: KanbanConfig<T>
+  viewMode?: 'table' | 'kanban'
+  onViewModeChange?: (viewMode: 'table' | 'kanban') => void
   rowKey: keyof T & string
   storageKey?: string
   frozenColumns?: number
@@ -52,6 +58,9 @@ export function defineTable<T extends object>(config: TableConfig<T>): TableDefi
   return {
     columns,
     actions: config.actions,
+    kanban: config.kanban,
+    viewMode: config.viewMode,
+    onViewModeChange: config.onViewModeChange,
     rowKey: config.rowKey,
     storageKey: config.storageKey,
     frozenColumns: config.frozenColumns,

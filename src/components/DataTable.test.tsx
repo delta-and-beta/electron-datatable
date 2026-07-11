@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { DataTable } from './DataTable'
 import type { ColumnDef, RowAction } from '../types'
 
@@ -24,6 +24,76 @@ describe('DataTable', () => {
     expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument()
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByText(/3 of 3 records/)).toBeInTheDocument()
+  })
+
+  it('shows no view toggle for existing consumers without kanban configuration', () => {
+    render(<DataTable columns={columns} data={data} rowKey="id" preset="full" />)
+
+    expect(screen.queryByRole('button', { name: 'Board view' })).not.toBeInTheDocument()
+  })
+
+  it('seeds the first group from laneField and persists uncontrolled view mode', async () => {
+    const kanbanColumns: ColumnDef<(typeof data)[number]>[] = [
+      ...columns,
+      { id: 'stage', label: 'Stage', type: 'text', options: ['Open', 'Won'] },
+    ]
+    const kanbanData = data.map((row, index) => ({
+      ...row,
+      stage: index === 0 ? 'Open' : 'Won',
+    }))
+    const props = {
+      columns: kanbanColumns,
+      data: kanbanData,
+      rowKey: 'id' as const,
+      storageKey: 'view-mode-round-trip',
+      preset: 'full' as const,
+      kanban: {
+        laneField: 'stage',
+        card: { titleField: 'name' },
+      },
+    }
+    const onViewModeChange = vi.fn()
+    localStorage.setItem('view-mode-round-trip-groupby', JSON.stringify({
+      groups: [],
+      collapsed: [],
+      showEmpty: false,
+    }))
+    const first = render(<DataTable {...props} onViewModeChange={onViewModeChange} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Board view' }))
+
+    expect(onViewModeChange).toHaveBeenCalledWith('kanban')
+    expect(screen.getByRole('region', { name: 'Open lane' })).toBeInTheDocument()
+    expect(screen.getByText(/3 of 3 records/)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(localStorage.getItem('view-mode-round-trip-viewmode')).toBe('kanban')
+    })
+
+    first.unmount()
+    render(<DataTable {...props} />)
+
+    expect(screen.getByRole('region', { name: 'Open lane' })).toBeInTheDocument()
+  })
+
+  it('honors controlled viewMode while notifying toggle changes', () => {
+    const onViewModeChange = vi.fn()
+    render(
+      <DataTable
+        columns={columns}
+        data={data}
+        rowKey="id"
+        preset="full"
+        viewMode="kanban"
+        onViewModeChange={onViewModeChange}
+        defaultGroupBy={[{ field: 'name', sort: 'asc' }]}
+        kanban={{ card: { titleField: 'name' } }}
+      />,
+    )
+
+    expect(screen.getByRole('region', { name: 'Alice lane' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Table view' }))
+    expect(onViewModeChange).toHaveBeenCalledWith('table')
+    expect(screen.getByRole('region', { name: 'Alice lane' })).toBeInTheDocument()
   })
 
   it('threads footerKpis through preset="full"', () => {

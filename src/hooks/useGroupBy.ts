@@ -14,6 +14,7 @@ interface UseGroupByOptions<T extends object> {
   sumFields?: string[]
   storageKey?: string
   defaultLevels?: GroupLevel[]
+  seedLevelWhenEmpty?: GroupLevel
 }
 
 export function useGroupBy<T extends object>({
@@ -22,6 +23,7 @@ export function useGroupBy<T extends object>({
   sumFields = [],
   storageKey,
   defaultLevels = [],
+  seedLevelWhenEmpty,
 }: UseGroupByOptions<T>) {
   const fullKey = storageKey ? `${storageKey}-groupby` : null
 
@@ -35,16 +37,25 @@ export function useGroupBy<T extends object>({
         if (saved) {
           const config = JSON.parse(saved)
           if (config && Array.isArray(config.groups)) {
-            return config.groups.filter(
+            const savedLevels = config.groups.filter(
               (g: unknown) => g && typeof g === 'object' && 'field' in g && typeof (g as GroupLevel).field === 'string' && validFields.has((g as GroupLevel).field)
             )
+            if (savedLevels.length > 0) return savedLevels
+            if (seedLevelWhenEmpty && validFields.has(seedLevelWhenEmpty.field)) {
+              return [seedLevelWhenEmpty]
+            }
+            return []
           }
         }
       } catch {
         // ignore
       }
     }
-    return defaultLevels.filter((level) => !tagFields.has(level.field))
+    const initialLevels = defaultLevels.filter((level) => !tagFields.has(level.field))
+    if (initialLevels.length > 0) return initialLevels
+    return seedLevelWhenEmpty && validFields.has(seedLevelWhenEmpty.field)
+      ? [seedLevelWhenEmpty]
+      : []
   })
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {

@@ -87,6 +87,24 @@ export interface GroupedSection<T extends object = RowData> {
   subgroups: GroupedSection<T>[]
 }
 
+/** Card and lane configuration for the kanban view */
+export interface KanbanConfig<T extends object = RowData> {
+  laneField?: string
+  laneOrder?: string[]
+  card: {
+    titleField: string
+    subtitleField?: string
+    footerFields?: string[]
+    render?: (row: T) => ReactNode
+  }
+  laneAggregate?: {
+    field: string
+    label?: string
+  }
+  allowMove?: boolean
+  onMove?: (rowKey: string, toLane: string) => void | Promise<void>
+}
+
 /** Filter operators for text columns */
 export type TextOperator = 'is' | 'is_not' | 'contains' | 'does_not_contain' | 'is_empty' | 'is_not_empty'
 
@@ -153,6 +171,9 @@ export interface DataTableProps<T extends object = RowData> {
   attachmentAdapter?: AttachmentAdapter
   defaultSort?: { field: string; direction: 'asc' | 'desc' }
   defaultGroupBy?: GroupLevel[]
+  kanban?: KanbanConfig<T>
+  viewMode?: 'table' | 'kanban'
+  onViewModeChange?: (viewMode: 'table' | 'kanban') => void
   onRowClick?: (row: T) => void
   onRowContextMenu?: (row: T, event: React.MouseEvent) => void
   toolbarExtra?: ReactNode

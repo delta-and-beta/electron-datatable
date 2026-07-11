@@ -34,4 +34,41 @@ describe('defineTable row actions', () => {
 
     expect(table.frozenColumns).toBe(1)
   })
+
+  it('preserves kanban configuration in the spreadable table definition', () => {
+    const onMove = vi.fn()
+    const kanban = {
+      laneField: 'name',
+      laneOrder: ['Alice', 'Bob'],
+      card: { titleField: 'name' },
+      allowMove: true,
+      onMove,
+    }
+
+    const table = defineTable<Person>({
+      rowKey: 'id',
+      columns: {
+        name: { label: 'Name', type: 'text' },
+      },
+      kanban,
+    })
+
+    expect(table.kanban).toBe(kanban)
+  })
+
+  it('preserves view mode control in the spreadable table definition', () => {
+    const onViewModeChange = vi.fn()
+
+    const table = defineTable<Person>({
+      rowKey: 'id',
+      columns: {
+        name: { label: 'Name', type: 'text' },
+      },
+      viewMode: 'kanban',
+      onViewModeChange,
+    })
+
+    expect(table.viewMode).toBe('kanban')
+    expect(table.onViewModeChange).toBe(onViewModeChange)
+  })
 })
