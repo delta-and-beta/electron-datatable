@@ -15,3 +15,4 @@ Delete the line when the feature ships.
 - Record coloring: row-level color rules by field value (Airtable parity). (gap matrix 2026-07-11)
 - Keyboard record navigation: arrow-key row focus + Enter opens the row. (gap matrix 2026-07-11)
 - CSV export / print of the current view. (gap matrix 2026-07-11)
+- Airtable sync adapter: fifth /sync adapter (Meta API schema, listRecords offset cursor, injected fetch client, snapshotConsistent:false). In build 2026-07-11.
