@@ -40,6 +40,15 @@ function progressLabel(progress: SyncProgress): string {
 }
 
 export function SyncStatusChip({ progress, result, now = new Date() }: SyncStatusChipProps) {
+  if (progress && progress.phase !== 'idle' && progress.phase !== 'done' && progress.phase !== 'error') {
+    return (
+      <StatusBadge variant="info" className="gap-1">
+        <LoaderCircle className="h-3 w-3 animate-spin" aria-label="Sync in progress" />
+        {progressLabel(progress)}
+      </StatusBadge>
+    )
+  }
+
   const error = progress?.phase === 'error'
     ? progress.message ?? result?.errors[0] ?? 'Sync failed'
     : result?.errors[0]
@@ -49,15 +58,6 @@ export function SyncStatusChip({ progress, result, now = new Date() }: SyncStatu
       <span title={error}>
         <StatusBadge variant="error">Sync failed</StatusBadge>
       </span>
-    )
-  }
-
-  if (progress && progress.phase !== 'idle' && progress.phase !== 'done') {
-    return (
-      <StatusBadge variant="info" className="gap-1">
-        <LoaderCircle className="h-3 w-3 animate-spin" aria-label="Sync in progress" />
-        {progressLabel(progress)}
-      </StatusBadge>
     )
   }
 

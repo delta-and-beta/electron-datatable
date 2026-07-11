@@ -23,12 +23,26 @@ interface InformationSchemaColumn {
   is_nullable: string
 }
 
+interface CompositeCursor {
+  watermark: unknown
+  key: unknown
+}
+
+function parseCompositeCursor(cursor: SyncCursor): CompositeCursor {
+  const parsed = JSON.parse(cursor) as Partial<CompositeCursor>
+  if (!('watermark' in parsed) || !('key' in parsed)) {
+    throw new TypeError('Postgres sync cursor is invalid')
+  }
+  return { watermark: parsed.watermark, key: parsed.key }
+}
+
 function quoteIdentifier(identifier: string): string {
   return `"${identifier.replace(/"/g, '""')}"`
 }
 
 export class PostgresSyncAdapter implements SyncAdapter {
   readonly id: string
+  readonly capabilities = { snapshotConsistent: true } as const
   private readonly schema: string
   private readonly pageSize: number
 
@@ -57,16 +71,28 @@ ORDER BY ordinal_position`,
   }
 
   async pull(cursor?: SyncCursor): Promise<SyncPage> {
-    const cursorColumn = this.options.watermarkColumn
-      ?? this.options.keyColumn
-      ?? this.options.externalIdColumn
-      ?? 'id'
+    const watermarkColumn = this.options.watermarkColumn
+    const externalIdColumn = this.options.externalIdColumn ?? 'id'
+    const cursorColumn = watermarkColumn ?? this.options.keyColumn ?? externalIdColumn
     const quotedColumn = quoteIdentifier(cursorColumn)
+    const quotedExternalId = quoteIdentifier(externalIdColumn)
     const table = `${quoteIdentifier(this.schema)}.${quoteIdentifier(this.options.table)}`
+    const state = watermarkColumn !== undefined && cursor !== undefined
+      ? parseCompositeCursor(cursor)
+      : undefined
+    const orderBy = watermarkColumn
+      ? `${quotedColumn}, ${quotedExternalId}`
+      : quotedColumn
     const sql = cursor === undefined
-      ? `SELECT * FROM ${table} ORDER BY ${quotedColumn} LIMIT $1`
-      : `SELECT * FROM ${table} WHERE ${quotedColumn} > $1 ORDER BY ${quotedColumn} LIMIT $2`
-    const params = cursor === undefined ? [this.pageSize] : [cursor, this.pageSize]
+      ? `SELECT * FROM ${table} ORDER BY ${orderBy} LIMIT $1`
+      : state
+        ? `SELECT * FROM ${table} WHERE ${quotedColumn} > $1 OR (${quotedColumn} = $2 AND ${quotedExternalId} > $3) ORDER BY ${orderBy} LIMIT $4`
+        : `SELECT * FROM ${table} WHERE ${quotedColumn} > $1 ORDER BY ${orderBy} LIMIT $2`
+    const params = cursor === undefined
+      ? [this.pageSize]
+      : state
+        ? [state.watermark, state.watermark, state.key, this.pageSize]
+        : [cursor, this.pageSize]
     const { rows } = await this.options.client.query(sql, params)
 
     if (rows.length === 0) {
@@ -76,6 +102,14 @@ ORDER BY ordinal_position`,
     const lastValue = rows[rows.length - 1]?.[cursorColumn]
     if (lastValue === undefined || lastValue === null) {
       throw new Error(`Postgres sync cursor column ${cursorColumn} is missing`)
+    }
+
+    if (watermarkColumn) {
+      const key = rows[rows.length - 1]?.[externalIdColumn]
+      if (key === undefined || key === null) {
+        throw new Error(`Postgres sync external id column ${externalIdColumn} is missing`)
+      }
+      return { rows, cursor: JSON.stringify({ watermark: lastValue, key }), done: false }
     }
 
     return { rows, cursor: String(lastValue), done: false }

@@ -1,6 +1,7 @@
 export type {
   DeletionPolicy,
   SourceColumn,
+  SourceColumnType,
   SourceSchema,
   SyncAdapter,
   SyncCursor,
@@ -27,10 +28,12 @@ export type {
   PostgresClient,
   PostgresSyncAdapterOptions,
 } from './sync/adapters/postgres'
-export { DynamoSyncAdapter } from './sync/adapters/dynamo'
+export { DynamoSyncAdapter, fromDocumentClient } from './sync/adapters/dynamo'
 export type {
   DynamoClient,
+  DynamoDocumentClient,
   DynamoScanInput,
+  DynamoScanCommandConstructor,
   DynamoScanOutput,
   DynamoSyncAdapterOptions,
 } from './sync/adapters/dynamo'

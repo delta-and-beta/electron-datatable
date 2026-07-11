@@ -34,6 +34,7 @@ interface PlannedUpsert {
 
 export class SyncEngine {
   private readonly deletionPolicy: DeletionPolicy
+  private readonly transactional: boolean
 
   constructor(
     private readonly adapter: SyncAdapter,
@@ -42,6 +43,17 @@ export class SyncEngine {
     private readonly onProgress?: SyncProgressCallback,
   ) {
     this.deletionPolicy = options.deletionPolicy ?? 'ignore'
+    if (this.deletionPolicy === 'delete' && adapter.capabilities?.snapshotConsistent !== true) {
+      throw new TypeError(
+        "deletionPolicy 'delete' requires a snapshot-consistent adapter; use 'markMissing' for this source",
+      )
+    }
+    const transactionHooks = [target.begin, target.commitTx, target.rollback]
+    const configuredHooks = transactionHooks.filter((hook) => hook !== undefined).length
+    if (configuredHooks > 0 && configuredHooks < transactionHooks.length) {
+      throw new TypeError('SyncTarget transactions require begin, commitTx, and rollback together')
+    }
+    this.transactional = configuredHooks === transactionHooks.length
   }
 
   dryRun(): Promise<SyncRunResult> {
@@ -61,10 +73,12 @@ export class SyncEngine {
     let cursor = this.options.watermark
     const seenIds = new Set<string>()
     const plannedUpserts = new Map<string, PlannedUpsert>()
+    let transactionStarted = false
 
     try {
       this.progress('schema', 0)
-      await this.adapter.describeSchema()
+      const schema = await this.adapter.describeSchema()
+      if (schema.warning) result.errors.push(schema.warning)
 
       const targetIds = new Set(await this.target.listIds?.() ?? [])
       let pageCount = 0
@@ -75,8 +89,8 @@ export class SyncEngine {
         const page = await this.adapter.pull(cursor)
         pageCount += 1
         result.fetched += page.rows.length
-        if (page.cursor !== null) cursor = page.cursor
-        result.cursor = cursor ?? null
+        cursor = page.cursor ?? undefined
+        result.cursor = page.cursor
 
         for (const row of page.rows) {
           const rawExternalId = row[this.options.externalIdField]
@@ -94,13 +108,26 @@ export class SyncEngine {
         this.progress('pulling', result.fetched)
       }
 
-      if (apply) this.progress('writing', 0)
+      if (apply) {
+        this.progress('writing', 0)
+        if (this.transactional) {
+          await this.target.begin!()
+          transactionStarted = true
+        }
+      }
+      let stoppedOnError = false
       for (const operation of plannedUpserts.values()) {
         if (apply) {
           try {
             await this.target.upsert(operation.externalId, operation.row)
           } catch (error) {
-            result.errors.push(`${operation.externalId}: ${errorMessage(error)}`)
+            const message = `${operation.externalId}: ${errorMessage(error)}`
+            if (this.transactional) throw new Error(message)
+            result.errors.push(message)
+            if (this.options.stopOnError) {
+              stoppedOnError = true
+              break
+            }
             continue
           }
         }
@@ -112,7 +139,7 @@ export class SyncEngine {
 
       this.progress('reconciling', 0)
       const completeSnapshot = this.options.watermark === undefined && done
-      if (completeSnapshot && this.deletionPolicy !== 'ignore') {
+      if (!stoppedOnError && completeSnapshot && this.deletionPolicy !== 'ignore') {
         const missingIds = [...targetIds].filter((id) => !seenIds.has(id))
         if (!apply || this.deletionPolicy === 'markMissing') {
           result.deleted = missingIds.length
@@ -122,16 +149,35 @@ export class SyncEngine {
               await this.target.delete(externalId)
               result.deleted += 1
             } catch (error) {
-              result.errors.push(`${externalId}: ${errorMessage(error)}`)
+              const message = `${externalId}: ${errorMessage(error)}`
+              if (this.transactional) throw new Error(message)
+              result.errors.push(message)
+              if (this.options.stopOnError) break
             }
           }
         }
       }
 
+      if (apply && this.transactional) {
+        await this.target.commitTx!()
+        transactionStarted = false
+      }
+
       this.progress('done', result.fetched)
     } catch (error) {
-      result.errors.push(errorMessage(error))
-      this.progress('error', result.fetched, errorMessage(error))
+      const message = errorMessage(error)
+      if (transactionStarted) {
+        try {
+          await this.target.rollback!()
+        } catch (rollbackError) {
+          result.errors.push(`Rollback failed: ${errorMessage(rollbackError)}`)
+        }
+        result.created = 0
+        result.updated = 0
+        result.deleted = 0
+      }
+      result.errors.unshift(message)
+      this.progress('error', result.fetched, message)
     }
 
     result.finishedAt = new Date().toISOString()
@@ -147,11 +193,28 @@ export interface PollingHandle {
 
 export function createPollingHandle(fn: () => void | Promise<void>, intervalMs: number): PollingHandle {
   let timer: ReturnType<typeof setInterval> | undefined
+  let pending = false
 
   return {
     start() {
       if (timer !== undefined) return
-      timer = setInterval(() => void fn(), intervalMs)
+      timer = setInterval(() => {
+        if (pending) return
+        pending = true
+        try {
+          const outcome = fn()
+          if (outcome instanceof Promise) {
+            void outcome.then(
+              () => { pending = false },
+              () => { pending = false },
+            )
+          } else {
+            pending = false
+          }
+        } catch {
+          pending = false
+        }
+      }, intervalMs)
     },
     stop() {
       if (timer === undefined) return

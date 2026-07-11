@@ -12,7 +12,8 @@ export interface SQLiteClient {
 export interface SQLiteSyncAdapterOptions {
   client: SQLiteClient
   table: string
-  select?: string | string[]
+  select?: string[]
+  externalIdColumn?: string
   watermarkColumn?: string
   pageSize?: number
 }
@@ -36,9 +37,13 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 export class SQLiteSyncAdapter implements SyncAdapter {
   readonly id: string
+  readonly capabilities = { snapshotConsistent: true } as const
   private readonly pageSize: number
 
   constructor(private readonly options: SQLiteSyncAdapterOptions) {
+    if (options.select !== undefined && !Array.isArray(options.select)) {
+      throw new TypeError('SQLite select must be an array of column names')
+    }
     this.id = `sqlite:${options.table}`
     this.pageSize = options.pageSize ?? 100
   }
@@ -57,14 +62,25 @@ export class SQLiteSyncAdapter implements SyncAdapter {
 
   async pull(cursor?: SyncCursor): Promise<SyncPage> {
     const watermarkColumn = this.options.watermarkColumn
+    const externalIdColumn = this.options.externalIdColumn ?? 'id'
     const select = this.selectClause()
     const cursorColumn = watermarkColumn ? quoteIdentifier(watermarkColumn) : 'rowid'
     const selected = watermarkColumn ? select : `${select}, rowid AS "__sync_rowid"`
     const firstWatermarkPage = watermarkColumn !== undefined && cursor === undefined
+    const state = watermarkColumn !== undefined && cursor !== undefined
+      ? this.parseCompositeCursor(cursor)
+      : undefined
+    const externalId = quoteIdentifier(externalIdColumn)
     const sql = firstWatermarkPage
-      ? `SELECT ${selected} FROM ${quoteIdentifier(this.options.table)} ORDER BY ${cursorColumn} LIMIT ?`
-      : `SELECT ${selected} FROM ${quoteIdentifier(this.options.table)} WHERE ${cursorColumn} > ? ORDER BY ${cursorColumn} LIMIT ?`
-    const args = firstWatermarkPage ? [this.pageSize] : [cursor ?? 0, this.pageSize]
+      ? `SELECT ${selected} FROM ${quoteIdentifier(this.options.table)} ORDER BY ${cursorColumn}, ${externalId} LIMIT ?`
+      : state
+        ? `SELECT ${selected} FROM ${quoteIdentifier(this.options.table)} WHERE ${cursorColumn} > ? OR (${cursorColumn} = ? AND ${externalId} > ?) ORDER BY ${cursorColumn}, ${externalId} LIMIT ?`
+        : `SELECT ${selected} FROM ${quoteIdentifier(this.options.table)} WHERE ${cursorColumn} > ? ORDER BY ${cursorColumn} LIMIT ?`
+    const args = firstWatermarkPage
+      ? [this.pageSize]
+      : state
+        ? [state.watermark, state.watermark, state.key, this.pageSize]
+        : [cursor ?? 0, this.pageSize]
     const rows = this.options.client.prepare(sql).all(...args).map(asRecord)
 
     if (rows.length === 0) {
@@ -81,13 +97,26 @@ export class SQLiteSyncAdapter implements SyncAdapter {
       ? rows
       : rows.map(({ __sync_rowid: _rowid, ...row }) => row)
 
+    if (watermarkColumn) {
+      const key = rows[rows.length - 1]?.[externalIdColumn]
+      if (key === undefined || key === null) {
+        throw new Error(`SQLite sync external id column ${externalIdColumn} is missing`)
+      }
+      return { rows: cleanRows, cursor: JSON.stringify({ watermark: lastValue, key }), done: false }
+    }
+
     return { rows: cleanRows, cursor: String(lastValue), done: false }
   }
 
-  private selectClause(): string {
-    if (Array.isArray(this.options.select)) {
-      return this.options.select.map(quoteIdentifier).join(', ')
+  private parseCompositeCursor(cursor: SyncCursor): { watermark: unknown, key: unknown } {
+    const parsed = JSON.parse(cursor) as { watermark?: unknown, key?: unknown }
+    if (!('watermark' in parsed) || !('key' in parsed)) {
+      throw new TypeError('SQLite sync cursor is invalid')
     }
-    return this.options.select ?? '*'
+    return { watermark: parsed.watermark, key: parsed.key }
+  }
+
+  private selectClause(): string {
+    return this.options.select?.map(quoteIdentifier).join(', ') ?? '*'
   }
 }
