@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowUp, ArrowDown, ArrowUpDown, Paperclip } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { formatDate, formatNumber, formatCurrency } from '../lib/format'
@@ -13,6 +13,14 @@ import { ACTIONS_COLUMN_ID } from '../actions'
 /** Resolve effective text alignment — currency/number default to right */
 function getAlign<T extends object>(col: ColumnDef<T>): 'left' | 'center' | 'right' {
   return col.align ?? ((col.type === 'currency' || col.type === 'number') ? 'right' : 'left')
+}
+
+function pixelWidth(width: string | number | undefined, measured?: number): number {
+  if (typeof width === 'number') return width
+  if (typeof width === 'string' && /^\d+(?:\.\d+)?(?:px)?$/.test(width.trim())) {
+    return Number.parseFloat(width)
+  }
+  return measured ?? 0
 }
 
 /* ---------------------------------------------------------------------------
@@ -109,6 +117,59 @@ export function Content<T extends object = RowData>({
     .filter((c): c is ColumnDef<T> => c !== undefined)
     .concat(columns.filter((column) => column.id === ACTIONS_COLUMN_ID))
 
+  const headerRefs = useRef(new Map<string, HTMLTableCellElement>())
+  const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({})
+  const visibleColumnSignature = visibleColumns.map((column) => column.id).join('\u0000')
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      setMeasuredWidths((previous) => {
+        let changed = false
+        const next = { ...previous }
+        for (const [id, header] of headerRefs.current) {
+          const width = header.getBoundingClientRect().width
+          if (width > 0 && previous[id] !== width) {
+            next[id] = width
+            changed = true
+          }
+        }
+        return changed ? next : previous
+      })
+    }
+
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver(measure)
+    headerRefs.current.forEach((header) => observer.observe(header))
+    return () => observer.disconnect()
+  }, [visibleColumnSignature])
+
+  const resolvedWidths = Object.fromEntries(
+    visibleColumns.map((column) => [
+      column.id,
+      columnState.widths[column.id] ?? column.width,
+    ]),
+  ) as Record<string, string | number | undefined>
+
+  const configurableVisibleColumns = visibleColumns.filter(
+    (column) => column.id !== ACTIONS_COLUMN_ID,
+  )
+  const frozenCount = Math.min(
+    columnState.frozenColumns,
+    configurableVisibleColumns.length,
+  )
+  const frozenIds = new Set(
+    configurableVisibleColumns.slice(0, frozenCount).map((column) => column.id),
+  )
+  const frozenOffsets: Record<string, number> = {}
+  let frozenOffset = 0
+  for (const column of configurableVisibleColumns.slice(0, frozenCount)) {
+    frozenOffsets[column.id] = frozenOffset
+    frozenOffset += pixelWidth(resolvedWidths[column.id], measuredWidths[column.id])
+  }
+  const lastFrozenId = configurableVisibleColumns[frozenCount - 1]?.id
+
   const hasAttachments = attachmentAdapter !== null
   const extraColSpan = hasAttachments ? 1 : 0
   const colSpan = Math.max(visibleColumns.length, 1) + extraColSpan
@@ -141,6 +202,7 @@ export function Content<T extends object = RowData>({
         key={key}
         data-row-id={record[rowKey] != null ? String(record[rowKey]) : undefined}
         className={cn(
+          'dt-data-row',
           isClickable && 'cursor-pointer',
           rowClassName?.(row),
         )}
@@ -174,16 +236,26 @@ export function Content<T extends object = RowData>({
           const value = record[col.id]
           const align = getAlign(col)
           const isFirstCol = col.id === visibleColumns[0]?.id
+          const isFrozen = frozenIds.has(col.id)
+          const isFrozenEdge = col.id === lastFrozenId
           return (
             <TableCell
               key={col.id}
               className={cn(
+                'relative z-0',
                 align === 'right' && 'text-right',
                 align === 'center' && 'text-center',
                 (col.type === 'currency' || col.type === 'number') && 'tabular-nums',
+                isFrozen && 'dt-frozen-cell sticky z-10',
+                isFrozenEdge && 'dt-frozen-edge',
               )}
               style={{
-                ...(col.width ? { width: col.width } : {}),
+                ...(resolvedWidths[col.id]
+                  ? { width: resolvedWidths[col.id] }
+                  : {}),
+                ...(isFrozen
+                  ? { position: 'sticky', left: frozenOffsets[col.id] }
+                  : {}),
                 ...(isFirstCol && groupRowIndent !== undefined
                   ? { paddingLeft: groupRowIndent }
                   : {}),
@@ -225,6 +297,9 @@ export function Content<T extends object = RowData>({
           onToggle={() => groupBy.toggleCollapse(path)}
           renderCell={renderAggregateCell}
           extraColSpan={extraColSpan}
+          resolvedWidths={resolvedWidths}
+          frozenOffsets={frozenOffsets}
+          lastFrozenId={lastFrozenId}
         />
 
         {!collapsed && (
@@ -295,6 +370,8 @@ export function Content<T extends object = RowData>({
           {visibleColumns.map((col) => {
             const align = getAlign(col)
             const isSortable = col.sortable !== false
+            const isFrozen = frozenIds.has(col.id)
+            const isFrozenEdge = col.id === lastFrozenId
 
             const ariaSortValue = !isSortable
               ? undefined
@@ -307,14 +384,25 @@ export function Content<T extends object = RowData>({
             return (
               <TableHead
                 key={col.id}
+                ref={(element) => {
+                  if (element) headerRefs.current.set(col.id, element)
+                  else headerRefs.current.delete(col.id)
+                }}
                 scope="col"
                 aria-sort={ariaSortValue}
                 className={cn(
                   'relative',
                   align === 'right' && 'text-right',
                   align === 'center' && 'text-center',
+                  isFrozen && 'dt-frozen-header sticky z-30',
+                  isFrozenEdge && 'dt-frozen-edge',
                 )}
-                style={{ width: columnState.widths[col.id] ?? col.width }}
+                style={{
+                  width: resolvedWidths[col.id],
+                  ...(isFrozen
+                    ? { position: 'sticky', left: frozenOffsets[col.id] }
+                    : {}),
+                }}
               >
                 {isSortable ? (
                   <button
@@ -369,6 +457,9 @@ export function Content<T extends object = RowData>({
                 isCollapsed={collapsed}
                 onToggle={() => groupBy.toggleCollapse(path)}
                 extraColSpan={extraColSpan}
+                resolvedWidths={resolvedWidths}
+                frozenOffsets={frozenOffsets}
+                lastFrozenId={lastFrozenId}
               />
 
               {!collapsed && (

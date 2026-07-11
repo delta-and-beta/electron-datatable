@@ -147,6 +147,8 @@ export interface DataTableProps<T extends object = RowData> {
   actions?: RowAction<T>[]
   rowKey: keyof T & string
   storageKey?: string
+  /** Number of leading visible data columns kept fixed during horizontal scroll */
+  frozenColumns?: number
   preset?: 'full' | 'minimal' | 'none'
   attachmentAdapter?: AttachmentAdapter
   defaultSort?: { field: string; direction: 'asc' | 'desc' }

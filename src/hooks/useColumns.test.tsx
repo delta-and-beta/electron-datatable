@@ -51,6 +51,45 @@ describe('useColumns', () => {
     expect(saved.widths.name).toBe(240)
   })
 
+  it('persists and restores the frozen column count', () => {
+    const first = renderHook(() => useColumns({
+      columns,
+      storageKey: 'frozen-round-trip',
+      frozenColumns: 2,
+    }))
+
+    expect(first.result.current.frozenColumns).toBe(2)
+    expect(JSON.parse(localStorage.getItem('frozen-round-trip-columns')!).frozen).toBe(2)
+
+    act(() => first.result.current.setFrozenColumns(1))
+    first.unmount()
+
+    const second = renderHook(() => useColumns({
+      columns,
+      storageKey: 'frozen-round-trip',
+      frozenColumns: 2,
+    }))
+    expect(second.result.current.frozenColumns).toBe(1)
+  })
+
+  it('loads a legacy column payload without frozen and falls back to the prop', () => {
+    localStorage.setItem('legacy-columns', JSON.stringify({
+      visible: ['name', 'email', 'age'],
+      order: ['name', 'email', 'age', 'hidden'],
+      widths: { name: 240 },
+    }))
+
+    const { result } = renderHook(() => useColumns({
+      columns,
+      storageKey: 'legacy',
+      frozenColumns: 2,
+    }))
+
+    expect(result.current.visibleColumns).toEqual(['name', 'email', 'age'])
+    expect(result.current.widths.name).toBe(240)
+    expect(result.current.frozenColumns).toBe(2)
+  })
+
   it('restores from localStorage', () => {
     localStorage.setItem('test-columns', JSON.stringify({
       visible: ['name', 'age'],

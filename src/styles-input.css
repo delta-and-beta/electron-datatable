@@ -96,3 +96,35 @@
 .hover\:bg-dt-primary\/50:hover {
   background-color: color-mix(in srgb, var(--dt-primary, #3b82f6) 50%, transparent);
 }
+
+/* Frozen leading columns use opaque layers so horizontally-scrolled content
+ * never shows through their backgrounds. */
+.dt-frozen-cell {
+  z-index: 10;
+  background: var(--dt-bg, #1a1a2e);
+}
+
+.dt-frozen-header {
+  z-index: 30;
+  background: var(--dt-bg, #1a1a2e);
+}
+
+.dt-group-frozen-cell {
+  z-index: 20;
+}
+
+.dt-frozen-edge {
+  border-right: 2px solid var(--dt-border, #374151) !important;
+}
+
+.dt-data-row:hover > .dt-frozen-cell {
+  background: color-mix(
+    in srgb,
+    var(--dt-bg-secondary, #16213e) 50%,
+    var(--dt-bg, #1a1a2e)
+  );
+}
+
+.dt-data-row[data-state='selected'] > .dt-frozen-cell {
+  background: var(--dt-bg-secondary, #16213e);
+}

@@ -33,6 +33,7 @@ function DataTableRoot<T extends object = RowData>({
   actions,
   rowKey,
   storageKey = 'dt',
+  frozenColumns = 0,
   preset = 'none',
   attachmentAdapter,
   defaultSort,
@@ -91,7 +92,7 @@ function DataTableRoot<T extends object = RowData>({
   })
 
   // Columns
-  const columnState = useColumns({ columns: configurableColumns, storageKey })
+  const columnState = useColumns({ columns: configurableColumns, storageKey, frozenColumns })
 
   // Group-by
   const sumFields = tableColumns
