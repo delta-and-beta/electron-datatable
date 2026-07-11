@@ -41,6 +41,8 @@ const airtableOptions = {
   client: airtableClient,
   baseId: 'appBase',
   table: 'Companies',
+  retryDelayMs: 1000,
+  rateLimitDelayMs: 30_000,
 } satisfies AirtableSyncAdapterOptions
 new AirtableSyncAdapter(airtableOptions)
 

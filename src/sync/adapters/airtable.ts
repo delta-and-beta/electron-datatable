@@ -1,6 +1,7 @@
 import type { SourceColumnType, SourceSchema, SyncAdapter, SyncCursor, SyncPage } from '../types'
 
 const RETRY_DELAY_MS = 1000
+const RATE_LIMIT_DELAY_MS = 30_000
 
 interface AirtableRecord {
   id: string
@@ -61,6 +62,11 @@ function sleep(delayMs: number): Promise<void> {
 }
 
 export interface AirtableClient {
+  /**
+   * Consumers should throw errors with a numeric `status` field so the adapter
+   * can distinguish rate limits, transient server failures, and client errors.
+   * A numeric `retryAfterMs` field may also provide an explicit retry delay.
+   */
   request(path: string, params?: Record<string, string>): Promise<unknown>
 }
 
@@ -73,6 +79,8 @@ export interface AirtableSyncAdapterOptions {
   pageSize?: number
   interPageDelayMs?: number
   maxRetries?: number
+  retryDelayMs?: number
+  rateLimitDelayMs?: number
 }
 
 export class AirtableSyncAdapter implements SyncAdapter {
@@ -81,6 +89,8 @@ export class AirtableSyncAdapter implements SyncAdapter {
   private readonly pageSize: number
   private readonly interPageDelayMs: number
   private readonly maxRetries: number
+  private readonly retryDelayMs: number
+  private readonly rateLimitDelayMs: number
   private lastRequestAt: number | undefined
 
   constructor(private readonly options: AirtableSyncAdapterOptions) {
@@ -88,6 +98,8 @@ export class AirtableSyncAdapter implements SyncAdapter {
     this.pageSize = Math.min(options.pageSize ?? 100, 100)
     this.interPageDelayMs = options.interPageDelayMs ?? 210
     this.maxRetries = Math.max(options.maxRetries ?? 1, 0)
+    this.retryDelayMs = options.retryDelayMs ?? RETRY_DELAY_MS
+    this.rateLimitDelayMs = options.rateLimitDelayMs ?? RATE_LIMIT_DELAY_MS
   }
 
   async describeSchema(): Promise<SourceSchema> {
@@ -142,10 +154,27 @@ export class AirtableSyncAdapter implements SyncAdapter {
           : await this.options.client.request(path, params)
       } catch (error) {
         if (retries >= this.maxRetries) throw error
+        const retryDelayMs = this.getRetryDelay(error)
+        if (retryDelayMs === undefined) throw error
         retries += 1
-        await sleep(RETRY_DELAY_MS)
+        await sleep(retryDelayMs)
       }
     }
+  }
+
+  private getRetryDelay(error: unknown): number | undefined {
+    const status = this.getErrorNumber(error, 'status')
+    const retryAfterMs = this.getErrorNumber(error, 'retryAfterMs')
+    if (status === 429) return retryAfterMs ?? this.rateLimitDelayMs
+    if (status !== undefined && status >= 500 && status < 600) return retryAfterMs ?? this.retryDelayMs
+    if (status === undefined) return retryAfterMs ?? this.retryDelayMs
+    return undefined
+  }
+
+  private getErrorNumber(error: unknown, field: 'status' | 'retryAfterMs'): number | undefined {
+    if (typeof error !== 'object' || error === null) return undefined
+    const value = (error as Record<string, unknown>)[field]
+    return typeof value === 'number' ? value : undefined
   }
 
   private async waitForRequestWindow(): Promise<void> {
