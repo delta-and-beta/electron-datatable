@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { DataTable } from './DataTable'
 import type { ColumnDef } from '../types'
+import { formatDate } from '../lib/format'
 
 type TestRow = {
   id: string
@@ -28,7 +29,7 @@ describe('inline cell editing', () => {
   it.each([
     [{ id: 'name', label: 'Name', type: 'text', editable: true }, 'Alice', 'text'],
     [{ id: 'amount', label: 'Amount', type: 'number', editable: true }, '125', 'number'],
-    [{ id: 'due', label: 'Due', type: 'date', editable: true }, 'Jul 12, 2026', 'date'],
+    [{ id: 'due', label: 'Due', type: 'date', editable: true }, formatDate('2026-07-12'), 'date'],
   ] as const)('opens a $2 editor on double-click', (column, displayedValue, inputType) => {
     render(
       <DataTable
@@ -99,7 +100,7 @@ describe('inline cell editing', () => {
   it.each([
     ['name', 'Name', 'text', 'Alice', 'Alicia', 'Alicia'],
     ['amount', 'Amount', 'number', '125', '250.5', 250.5],
-    ['due', 'Due', 'date', 'Jul 12, 2026', '2026-08-03', '2026-08-03'],
+    ['due', 'Due', 'date', formatDate('2026-07-12'), '2026-08-03', '2026-08-03'],
   ] as const)('commits a typed $2 value with Enter', async (id, label, type, displayedValue, inputValue, expected) => {
     const onCellEdit = vi.fn()
     const columns: ColumnDef<TestRow>[] = [{ id, label, type, editable: true } as ColumnDef<TestRow>]
