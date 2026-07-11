@@ -1,6 +1,6 @@
 // Compound component root — wires together all hooks and provides context
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGrid, List } from 'lucide-react'
 import type { RowData, DataTableProps } from '../types'
 import { DataTableProvider, useDataTable, type DataTableContextValue } from '../context'
@@ -9,6 +9,7 @@ import { useColumns } from '../hooks/useColumns'
 import { useSearch } from '../hooks/useSearch'
 import { useSort } from '../hooks/useSort'
 import { useFilter } from '../hooks/useFilter'
+import { useViews } from '../hooks/useViews'
 import { Toolbar } from './Toolbar'
 import { Content } from './Content'
 import { Footer, type FooterKpi } from './Footer'
@@ -28,6 +29,7 @@ import { cn } from '../lib/utils'
 import { ACTIONS_COLUMN_ID, makeActionsColumn } from '../actions'
 import { asRecord } from '../lib/as-record'
 import { KanbanBoard } from './KanbanBoard'
+import { ViewsMenu } from './ViewsMenu'
 
 function DataTableRoot<T extends object = RowData>({
   data,
@@ -59,6 +61,16 @@ function DataTableRoot<T extends object = RowData>({
     }
   })
   const viewMode = kanban ? controlledViewMode ?? uncontrolledViewMode : 'table'
+  const viewModeRef = useRef(viewMode)
+  const controlledViewModeRef = useRef(controlledViewMode)
+  const kanbanRef = useRef(kanban)
+  const onViewModeChangeRef = useRef(onViewModeChange)
+  const storageKeyRef = useRef(storageKey)
+  viewModeRef.current = viewMode
+  controlledViewModeRef.current = controlledViewMode
+  kanbanRef.current = kanban
+  onViewModeChangeRef.current = onViewModeChange
+  storageKeyRef.current = storageKey
 
   useEffect(() => {
     if (!kanban || controlledViewMode !== undefined) return
@@ -69,10 +81,22 @@ function DataTableRoot<T extends object = RowData>({
     }
   }, [controlledViewMode, kanban, storageKey, uncontrolledViewMode])
 
-  const setViewMode = useCallback((next: 'table' | 'kanban') => {
-    if (controlledViewMode === undefined) setUncontrolledViewMode(next)
-    onViewModeChange?.(next)
-  }, [controlledViewMode, onViewModeChange])
+  const getViewModeSnapshot = useCallback(() => viewModeRef.current, [])
+  const setViewMode = useCallback((requested: 'table' | 'kanban') => {
+    const next = requested === 'kanban' && !kanbanRef.current ? 'table' : requested
+    if (controlledViewModeRef.current === undefined) setUncontrolledViewMode(next)
+    try {
+      localStorage.setItem(`${storageKeyRef.current}-viewmode`, next)
+    } catch {
+      // ignore quota errors
+    }
+    viewModeRef.current = next
+    onViewModeChangeRef.current?.(next)
+  }, [])
+  const viewModeFacet = useMemo(() => ({
+    getSnapshot: getViewModeSnapshot,
+    restore: setViewMode,
+  }), [getViewModeSnapshot, setViewMode])
 
   const tableColumns = useMemo(() => {
     const columnsWithTagOptions = columns.map((column) => {
@@ -143,6 +167,15 @@ function DataTableRoot<T extends object = RowData>({
       : undefined,
   })
 
+  const views = useViews({
+    storageKey,
+    columns: columnState,
+    sort,
+    filter,
+    groupBy,
+    viewMode: viewModeFacet,
+  })
+
   // Date filter
   const [dateFilter, setDateFilter] = useState<{
     field: string
@@ -179,6 +212,7 @@ function DataTableRoot<T extends object = RowData>({
       columnState,
       groupBy,
       filter,
+      views,
       dateFilter,
       setDateFilter,
       attachmentAdapter: attachmentAdapter ?? null,
@@ -201,6 +235,7 @@ function DataTableRoot<T extends object = RowData>({
       columnState,
       groupBy,
       filter,
+      views,
       dateFilter,
       attachmentAdapter,
       attachmentCounts,
@@ -333,6 +368,7 @@ function FullPresetToolbar({
 
   return (
     <Toolbar>
+      <ViewsMenu />
       <Search className="w-80" />
       {toolbarExtra}
       <div className="flex items-center gap-3">
@@ -436,4 +472,5 @@ export const DataTable = Object.assign(DataTableRoot, {
   FilterPanel: FilterConfigPanel,
   GroupHeader,
   KanbanBoard,
+  ViewsMenu,
 })

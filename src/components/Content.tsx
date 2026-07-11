@@ -47,7 +47,12 @@ export function Content<T extends object = RowData>({
   renderCell,
   onRowClick,
 }: ContentProps<T>) {
-  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey, attachmentAdapter, attachmentCounts } = useDataTable<T>()
+  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey, attachmentAdapter, attachmentCounts, views } = useDataTable<T>()
+  const rowHeightClass = {
+    short: 'dt-row-height-short py-1.5',
+    medium: 'dt-row-height-medium py-3',
+    tall: 'dt-row-height-tall py-5',
+  }[views.rowHeight]
 
   // Resolve visible columns in display order
   const visibleColumns = columnState.visibleColumns
@@ -141,6 +146,7 @@ export function Content<T extends object = RowData>({
         data-row-id={record[rowKey] != null ? String(record[rowKey]) : undefined}
         className={cn(
           'dt-data-row',
+          `dt-row-height-${views.rowHeight}`,
           isClickable && 'cursor-pointer',
           rowClassName?.(row),
         )}
@@ -159,7 +165,7 @@ export function Content<T extends object = RowData>({
         }
       >
         {hasAttachments && (
-          <TableCell key="__attachments" className="text-center" style={{ width: '50px' }}>
+          <TableCell key="__attachments" className={cn('text-center', rowHeightClass)} style={{ width: '50px' }}>
             {(attachmentCounts[String(record[rowKey])] ?? 0) > 0 ? (
               <span className="flex items-center justify-center gap-0.5 text-dt-primary">
                 <Paperclip className="w-3.5 h-3.5" />
@@ -181,6 +187,7 @@ export function Content<T extends object = RowData>({
               key={col.id}
               className={cn(
                 'relative z-0',
+                rowHeightClass,
                 align === 'right' && 'text-right',
                 align === 'center' && 'text-center',
                 (col.type === 'currency' || col.type === 'number') && 'tabular-nums',

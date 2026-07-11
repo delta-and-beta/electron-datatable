@@ -19,6 +19,8 @@ export type {
   FilterCondition,
   FilterGroup,
   FilterConfig,
+  DataTableView,
+  DataTableRowHeight,
 } from './types'
 
 // Config helpers
@@ -49,6 +51,7 @@ export { useColumns } from './hooks/useColumns'
 export { useSearch } from './hooks/useSearch'
 export { useSort } from './hooks/useSort'
 export { useFilter } from './hooks/useFilter'
+export { useViews } from './hooks/useViews'
 
 // Context
 export { DataTableProvider, useDataTable } from './context'
@@ -63,6 +66,7 @@ export { Toolbar } from './components/Toolbar'
 export { Footer } from './components/Footer'
 export type { FooterKpi } from './components/Footer'
 export { Popover } from './components/Popover'
+export { ViewsMenu } from './components/ViewsMenu'
 export { GroupByToolbarButton } from './components/toolbar/GroupByToolbarButton'
 export { GroupByConfigPanel } from './components/toolbar/GroupByConfigPanel'
 export { SortToolbarButton } from './components/toolbar/SortToolbarButton'

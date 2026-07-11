@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import type { ColumnDef, FilterGroup, FilterConfig, FilterCondition } from '../types'
 import { filterRecords, createEmptyGroup, createEmptyCondition, countConditions } from '../lib/filter'
 
@@ -89,6 +89,14 @@ export function useFilter<T extends object>({
     }
     return true
   })
+  const rootRef = useRef(root)
+  const enabledRef = useRef(enabled)
+  const columnsRef = useRef(columns)
+  const fullKeyRef = useRef(fullKey)
+  rootRef.current = root
+  enabledRef.current = enabled
+  columnsRef.current = columns
+  fullKeyRef.current = fullKey
 
   useEffect(() => {
     if (!fullKey) return
@@ -162,6 +170,30 @@ export function useFilter<T extends object>({
     setRoot(createEmptyGroup())
   }, [])
 
+  const getSnapshot = useCallback((): FilterConfig => ({
+    root: rootRef.current,
+    enabled: enabledRef.current,
+  }), [])
+
+  const restore = useCallback((snapshot: FilterConfig) => {
+    const validFields = new Set(columnsRef.current.filter((column) => column.filterable !== false).map((column) => column.id))
+    const next: FilterConfig = {
+      root: validateFilterGroup(snapshot.root, validFields),
+      enabled: snapshot.enabled,
+    }
+    if (fullKeyRef.current) {
+      try {
+        localStorage.setItem(fullKeyRef.current, JSON.stringify(next))
+      } catch {
+        // ignore quota errors
+      }
+    }
+    rootRef.current = next.root
+    enabledRef.current = next.enabled
+    setRoot(next.root)
+    setEnabled(next.enabled)
+  }, [])
+
   return {
     root,
     filteredData,
@@ -175,5 +207,7 @@ export function useFilter<T extends object>({
     removeGroup,
     updateConjunction,
     clearAll,
+    getSnapshot,
+    restore,
   }
 }

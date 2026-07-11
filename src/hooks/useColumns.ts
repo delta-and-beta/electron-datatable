@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { ColumnDef } from '../types'
 
 interface UseColumnsOptions<T extends object> {
@@ -7,7 +7,7 @@ interface UseColumnsOptions<T extends object> {
   frozenColumns?: number
 }
 
-interface ColumnState {
+export interface ColumnSnapshot {
   visible: string[]
   order: string[]
   widths: Record<string, number>
@@ -27,7 +27,7 @@ export function useColumns<T extends object>({
 }: UseColumnsOptions<T>) {
   const fullKey = storageKey ? `${storageKey}-columns` : null
 
-  const [state, setState] = useState<ColumnState>(() => {
+  const [state, setState] = useState<ColumnSnapshot>(() => {
     if (fullKey) {
       try {
         const saved = localStorage.getItem(fullKey)
@@ -59,6 +59,12 @@ export function useColumns<T extends object>({
       frozen: normalizeFrozen(frozenColumns),
     }
   })
+  const stateRef = useRef(state)
+  const columnsRef = useRef(columns)
+  const fullKeyRef = useRef(fullKey)
+  stateRef.current = state
+  columnsRef.current = columns
+  fullKeyRef.current = fullKey
 
   // Persist
   useEffect(() => {
@@ -98,6 +104,32 @@ export function useColumns<T extends object>({
     setState((prev) => ({ ...prev, frozen: normalizeFrozen(count) }))
   }, [])
 
+  const getSnapshot = useCallback((): ColumnSnapshot => ({
+    visible: [...stateRef.current.visible],
+    order: [...stateRef.current.order],
+    widths: { ...stateRef.current.widths },
+    frozen: stateRef.current.frozen,
+  }), [])
+
+  const restore = useCallback((snapshot: ColumnSnapshot) => {
+    const validIds = new Set(columnsRef.current.map((column) => column.id))
+    const next: ColumnSnapshot = {
+      visible: snapshot.visible.filter((id) => validIds.has(id)),
+      order: snapshot.order.filter((id) => validIds.has(id)),
+      widths: { ...snapshot.widths },
+      frozen: normalizeFrozen(snapshot.frozen),
+    }
+    if (fullKeyRef.current) {
+      try {
+        localStorage.setItem(fullKeyRef.current, JSON.stringify(next))
+      } catch {
+        // ignore quota errors
+      }
+    }
+    stateRef.current = next
+    setState(next)
+  }, [])
+
   return {
     visibleColumns,
     allColumns: state.order,
@@ -108,5 +140,7 @@ export function useColumns<T extends object>({
     setColumnWidth,
     setFrozenColumns,
     isVisible,
+    getSnapshot,
+    restore,
   }
 }

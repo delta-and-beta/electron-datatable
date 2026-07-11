@@ -110,4 +110,23 @@ describe('useSort', () => {
     const { result } = renderHook(() => useSort({ data, storageKey: 'mig' }))
     expect(result.current.sortLevels).toEqual([{ field: 'age', direction: 'desc' }])
   })
+
+  it('round-trips a snapshot and persists the restored value immediately', () => {
+    const { result } = renderHook(() => useSort({ data, storageKey: 'snapshot-sort' }))
+    const originalGetSnapshot = result.current.getSnapshot
+    const originalRestore = result.current.restore
+
+    act(() => result.current.setSortLevels([
+      { field: 'name', direction: 'asc' },
+      { field: 'age', direction: 'desc' },
+    ]))
+    const snapshot = result.current.getSnapshot()
+    act(() => result.current.setSort('age', 'asc'))
+    act(() => result.current.restore(snapshot))
+
+    expect(result.current.getSnapshot()).toEqual(snapshot)
+    expect(JSON.parse(localStorage.getItem('snapshot-sort-sort')!)).toEqual(snapshot)
+    expect(result.current.getSnapshot).toBe(originalGetSnapshot)
+    expect(result.current.restore).toBe(originalRestore)
+  })
 })
