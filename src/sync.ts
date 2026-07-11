@@ -22,3 +22,25 @@ export type {
   SQLiteStatement,
   SQLiteSyncAdapterOptions,
 } from './sync/adapters/sqlite'
+export { PostgresSyncAdapter } from './sync/adapters/postgres'
+export type {
+  PostgresClient,
+  PostgresSyncAdapterOptions,
+} from './sync/adapters/postgres'
+export { DynamoSyncAdapter } from './sync/adapters/dynamo'
+export type {
+  DynamoClient,
+  DynamoScanInput,
+  DynamoScanOutput,
+  DynamoSyncAdapterOptions,
+} from './sync/adapters/dynamo'
+export { BigQuerySyncAdapter } from './sync/adapters/bigquery'
+export type {
+  BigQueryClient,
+  BigQueryOptions,
+  BigQuerySyncAdapterOptions,
+} from './sync/adapters/bigquery'
+export { SyncStatusChip } from './sync/SyncStatusChip'
+export type { SyncStatusChipProps } from './sync/SyncStatusChip'
+export { useSyncStatus } from './sync/useSyncStatus'
+export type { UseSyncStatusReturn } from './sync/useSyncStatus'
