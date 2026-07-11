@@ -43,6 +43,11 @@ export type {
   BigQueryOptions,
   BigQuerySyncAdapterOptions,
 } from './sync/adapters/bigquery'
+export { AirtableSyncAdapter } from './sync/adapters/airtable'
+export type {
+  AirtableClient,
+  AirtableSyncAdapterOptions,
+} from './sync/adapters/airtable'
 export { SyncStatusChip } from './sync/SyncStatusChip'
 export type { SyncStatusChipProps } from './sync/SyncStatusChip'
 export { useSyncStatus } from './sync/useSyncStatus'

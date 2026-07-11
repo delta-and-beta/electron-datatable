@@ -7,6 +7,7 @@ export interface SourceColumn {
 export type SourceColumnType =
   | 'string'
   | 'number'
+  | 'date'
   | 'boolean'
   | 'tags'
   | 'custom'

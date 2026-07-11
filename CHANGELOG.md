@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-07-11
+
+### Added
+
+- **Airtable sync adapter.** `AirtableSyncAdapter` provides dependency-free
+  offset paging, schema discovery, Airtable record flattening, request pacing,
+  and configurable retry behavior through a consumer-supplied structural
+  client. Live-base scans are marked non-snapshot-consistent so destructive
+  deletion remains guarded by `SyncEngine`.
+
 ## [0.8.0] - 2026-07-11
 
 ### Added
