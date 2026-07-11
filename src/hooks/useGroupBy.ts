@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import type { ColumnDef, GroupLevel, GroupConfig, GroupedSection } from '../types'
 import { groupRecords } from '../lib/group-by'
 
@@ -89,6 +89,16 @@ export function useGroupBy<T extends object>({
     }
     return false
   })
+  const levelsRef = useRef(levels)
+  const collapsedRef = useRef(collapsed)
+  const showEmptyRef = useRef(showEmpty)
+  const columnsRef = useRef(columns)
+  const fullKeyRef = useRef(fullKey)
+  levelsRef.current = levels
+  collapsedRef.current = collapsed
+  showEmptyRef.current = showEmpty
+  columnsRef.current = columns
+  fullKeyRef.current = fullKey
 
   // Persist to localStorage
   useEffect(() => {
@@ -201,6 +211,37 @@ export function useGroupBy<T extends object>({
     [collapsed],
   )
 
+  const getSnapshot = useCallback((): GroupConfig => ({
+    groups: levelsRef.current.map((level) => ({ ...level })),
+    collapsed: [...collapsedRef.current],
+    showEmpty: showEmptyRef.current,
+  }), [])
+
+  const restore = useCallback((snapshot: GroupConfig) => {
+    const validFields = new Set(columnsRef.current.filter(isGroupable).map((column) => column.id))
+    const next: GroupConfig = {
+      groups: snapshot.groups
+        .filter((level) => validFields.has(level.field))
+        .map((level) => ({ ...level })),
+      collapsed: [...(snapshot.collapsed ?? [])],
+      showEmpty: snapshot.showEmpty,
+    }
+    if (fullKeyRef.current) {
+      try {
+        localStorage.setItem(fullKeyRef.current, JSON.stringify(next))
+      } catch {
+        // ignore quota errors
+      }
+    }
+    const nextCollapsed = new Set(next.collapsed)
+    levelsRef.current = next.groups
+    collapsedRef.current = nextCollapsed
+    showEmptyRef.current = next.showEmpty
+    setLevels(next.groups)
+    setCollapsed(nextCollapsed)
+    setShowEmpty(next.showEmpty)
+  }, [])
+
   return {
     levels,
     groupedData,
@@ -216,5 +257,7 @@ export function useGroupBy<T extends object>({
     isCollapsed,
     showEmpty,
     setShowEmpty,
+    getSnapshot,
+    restore,
   }
 }

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-07-11
+
+### Added
+
+- **Named views.** Save, switch, rename, duplicate, delete, and set-default
+  table views — a view captures sort, filters, grouping, column state
+  (including frozen count), view mode, and row height. `useViews` +
+  `ViewsMenu` exported; a Views popover ships in the full-preset toolbar.
+  Existing per-facet localStorage state is migrated into a "Default" view on
+  first run — nothing is lost. Search is intentionally not part of a view.
+- **Row height density.** `rowHeight: 'short' | 'medium' | 'tall'`, part of
+  the view payload.
+
 ## [0.5.0] - 2026-07-11
 
 ### Added

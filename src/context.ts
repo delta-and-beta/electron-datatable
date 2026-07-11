@@ -5,6 +5,7 @@ import type { useGroupBy } from './hooks/useGroupBy'
 import type { useColumns } from './hooks/useColumns'
 import type { useSort } from './hooks/useSort'
 import type { useFilter } from './hooks/useFilter'
+import type { useViews } from './hooks/useViews'
 
 export interface DataTableContextValue<T extends object = RowData> {
   // Data pipeline
@@ -29,6 +30,9 @@ export interface DataTableContextValue<T extends object = RowData> {
 
   // Condition filter
   filter: ReturnType<typeof useFilter<T>>
+
+  // Named views and row density
+  views: ReturnType<typeof useViews>
 
   // Date filter
   dateFilter: { field: string; start?: Date; end?: Date } | null

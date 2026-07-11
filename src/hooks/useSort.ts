@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { sortRecordsMulti, type SortLevel } from '../lib/sort'
 
 interface UseSortOptions<T extends object> {
@@ -41,6 +41,10 @@ export function useSort<T extends object>({
     }
     return defaultField ? [{ field: defaultField, direction: defaultDirection }] : []
   })
+  const levelsRef = useRef(levels)
+  const fullKeyRef = useRef(fullKey)
+  levelsRef.current = levels
+  fullKeyRef.current = fullKey
 
   // Persist
   useEffect(() => {
@@ -65,6 +69,23 @@ export function useSort<T extends object>({
     })
   }, [])
 
+  const getSnapshot = useCallback((): SortLevel[] => (
+    levelsRef.current.map((level) => ({ ...level }))
+  ), [])
+
+  const restore = useCallback((snapshot: SortLevel[]) => {
+    const next = snapshot.map((level) => ({ ...level }))
+    if (fullKeyRef.current) {
+      try {
+        localStorage.setItem(fullKeyRef.current, JSON.stringify(next))
+      } catch {
+        // ignore quota errors
+      }
+    }
+    levelsRef.current = next
+    setLevels(next)
+  }, [])
+
   return {
     // Backward-compatible single-field view (the primary level)
     sortField: levels[0]?.field ?? null,
@@ -74,5 +95,7 @@ export function useSort<T extends object>({
     sortLevels: levels,
     setSortLevels: setLevels,
     sortedData,
+    getSnapshot,
+    restore,
   }
 }

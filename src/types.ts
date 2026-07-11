@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { BadgeVariant } from './components/StatusBadge'
 import type { FooterKpi } from './components/Footer'
+import type { SortLevel } from './lib/sort'
 
 /** @deprecated Use your domain row type directly instead */
 export type RowData = Record<string, unknown>
@@ -140,6 +141,29 @@ export interface FilterGroup {
 export interface FilterConfig {
   root: FilterGroup
   enabled: boolean
+}
+
+export type DataTableRowHeight = 'short' | 'medium' | 'tall'
+
+/** A saved snapshot of all persistent table presentation state. */
+export interface DataTableView {
+  id: string
+  name: string
+  viewMode?: 'table' | 'kanban'
+  sort: SortLevel[]
+  filter: FilterConfig
+  groupBy: {
+    groups: GroupLevel[]
+    collapsed?: string[]
+    showEmpty: boolean
+  }
+  columns: {
+    visible: string[]
+    order: string[]
+    widths: Record<string, number>
+    frozen?: number
+  }
+  rowHeight?: DataTableRowHeight
 }
 
 /** Attachment adapter — consumers implement for their storage backend */

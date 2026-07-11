@@ -21,6 +21,7 @@ beforeEach(() => {
 describe('DataTable', () => {
   it('renders preset="full" with search, toolbar, content, and footer', () => {
     render(<DataTable columns={columns} data={data} rowKey="id" preset="full" />)
+    expect(screen.getAllByRole('button')[0]).toHaveAccessibleName('Views')
     expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument()
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByText(/3 of 3 records/)).toBeInTheDocument()
@@ -114,6 +115,7 @@ describe('DataTable', () => {
   it('renders preset="minimal" without toolbar', () => {
     render(<DataTable columns={columns} data={data} rowKey="id" preset="minimal" />)
     expect(screen.queryByPlaceholderText('Search...')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Views' })).not.toBeInTheDocument()
     expect(screen.getByText('Alice')).toBeInTheDocument()
   })
 
@@ -124,6 +126,39 @@ describe('DataTable', () => {
       </DataTable>
     )
     expect(screen.getByText('Alice')).toBeInTheDocument()
+  })
+
+  it('exposes ViewsMenu for compound users', () => {
+    render(
+      <DataTable columns={columns} data={data} rowKey="id" preset="none">
+        <DataTable.ViewsMenu />
+      </DataTable>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Views' })).toBeInTheDocument()
+  })
+
+  it('saves a named view, shows dirty state, and updates it', () => {
+    render(<DataTable columns={columns} data={data} rowKey="id" preset="full" storageKey="views-ui" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Views' }))
+    fireEvent.change(screen.getByPlaceholderText('View name'), { target: { value: 'Finance' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save view' }))
+
+    expect(screen.getByText('Finance')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Tall rows' }))
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Update view' }))
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument()
+  })
+
+  it('applies the selected row-height class to body rows', () => {
+    render(<DataTable columns={columns} data={data} rowKey="id" preset="full" storageKey="row-height" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Views' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Short rows' }))
+
+    expect(screen.getByText('Alice').closest('tr')).toHaveClass('dt-row-height-short')
+    expect(screen.getByText('Alice').closest('td')).toHaveClass('py-1.5')
   })
 
   it('shows empty state when data is empty', () => {

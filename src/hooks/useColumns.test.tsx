@@ -113,4 +113,26 @@ describe('useColumns', () => {
     const { result } = renderHook(() => useColumns({ columns, storageKey: 'test' }))
     expect(result.current.visibleColumns).toEqual(['name', 'email', 'age'])
   })
+
+  it('round-trips a snapshot and persists the restored value immediately', () => {
+    const { result } = renderHook(() => useColumns({ columns, storageKey: 'snapshot-columns' }))
+    const originalGetSnapshot = result.current.getSnapshot
+    const originalRestore = result.current.restore
+
+    act(() => {
+      result.current.setColumnVisibility('email', false)
+      result.current.reorderColumns(0, 2)
+      result.current.setColumnWidth('name', 240)
+      result.current.setFrozenColumns(2)
+    })
+    const snapshot = result.current.getSnapshot()
+
+    act(() => result.current.setColumnVisibility('email', true))
+    act(() => result.current.restore(snapshot))
+
+    expect(result.current.getSnapshot()).toEqual(snapshot)
+    expect(JSON.parse(localStorage.getItem('snapshot-columns-columns')!)).toEqual(snapshot)
+    expect(result.current.getSnapshot).toBe(originalGetSnapshot)
+    expect(result.current.restore).toBe(originalRestore)
+  })
 })

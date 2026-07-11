@@ -103,4 +103,28 @@ describe('useFilter', () => {
     const { result } = renderHook(() => useFilter({ data, columns, storageKey: 'test' }))
     expect(result.current.activeCount).toBe(0)
   })
+
+  it('round-trips a snapshot and persists the restored value immediately', () => {
+    const { result } = renderHook(() => useFilter({ data, columns, storageKey: 'snapshot-filter' }))
+    const originalGetSnapshot = result.current.getSnapshot
+    const originalRestore = result.current.restore
+
+    act(() => result.current.addCondition(result.current.root.id, 'name'))
+    const conditionId = result.current.root.conditions[0].id
+    act(() => result.current.updateCondition(result.current.root.id, conditionId, {
+      operator: 'contains',
+      value: 'ali',
+    }))
+    act(() => result.current.setEnabled(false))
+    const snapshot = result.current.getSnapshot()
+
+    act(() => result.current.clearAll())
+    act(() => result.current.setEnabled(true))
+    act(() => result.current.restore(snapshot))
+
+    expect(result.current.getSnapshot()).toEqual(snapshot)
+    expect(JSON.parse(localStorage.getItem('snapshot-filter-filters')!)).toEqual(snapshot)
+    expect(result.current.getSnapshot).toBe(originalGetSnapshot)
+    expect(result.current.restore).toBe(originalRestore)
+  })
 })
