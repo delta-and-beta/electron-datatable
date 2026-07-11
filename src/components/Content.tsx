@@ -15,11 +15,12 @@ function getAlign<T extends object>(col: ColumnDef<T>): 'left' | 'center' | 'rig
 }
 
 function pixelWidth(width: string | number | undefined, measured?: number): number {
+  if (measured !== undefined && measured > 0) return measured
   if (typeof width === 'number') return width
   if (typeof width === 'string' && /^\d+(?:\.\d+)?(?:px)?$/.test(width.trim())) {
     return Number.parseFloat(width)
   }
-  return measured ?? 0
+  return 0
 }
 
 /* ---------------------------------------------------------------------------
@@ -62,7 +63,9 @@ export function Content<T extends object = RowData>({
 
   const headerRefs = useRef(new Map<string, HTMLTableCellElement>())
   const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({})
-  const visibleColumnSignature = visibleColumns.map((column) => column.id).join('\u0000')
+  const visibleColumnSignature = visibleColumns.map((column) => (
+    `${column.id}:${String(columnState.widths[column.id] ?? column.width ?? '')}`
+  )).join('\u0000')
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -81,11 +84,17 @@ export function Content<T extends object = RowData>({
     }
 
     measure()
-    if (typeof ResizeObserver === 'undefined') return
+    window.addEventListener('resize', measure)
+    if (typeof ResizeObserver === 'undefined') {
+      return () => window.removeEventListener('resize', measure)
+    }
 
     const observer = new ResizeObserver(measure)
     headerRefs.current.forEach((header) => observer.observe(header))
-    return () => observer.disconnect()
+    return () => {
+      window.removeEventListener('resize', measure)
+      observer.disconnect()
+    }
   }, [visibleColumnSignature])
 
   const resolvedWidths = Object.fromEntries(

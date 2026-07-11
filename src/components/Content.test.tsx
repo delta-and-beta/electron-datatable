@@ -53,7 +53,9 @@ describe('Content', () => {
     )
 
     const nameHeader = screen.getByText('Name').closest('th')!
-    nameHeader.getBoundingClientRect = () => ({ width: 120 } as DOMRect)
+    nameHeader.getBoundingClientRect = () => ({
+      width: Number.parseFloat(nameHeader.style.width) || 120,
+    } as DOMRect)
 
     fireEvent.mouseDown(within(nameHeader).getByTitle('Drag to resize'), { clientX: 100 })
     fireEvent.mouseMove(document, { clientX: 180 })
@@ -123,6 +125,35 @@ describe('Content', () => {
     expect(screen.getByText('Open').closest('td')).toHaveClass('relative', 'z-0')
   })
 
+  it('prefers painted header widths over configured widths for frozen offsets', () => {
+    const frozenColumns: ColumnDef[] = [
+      { id: 'name', label: 'Name', type: 'text', width: '120px' },
+      { id: 'amount', label: 'Amount', type: 'number', width: '80px' },
+    ]
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        return { width: this.textContent?.includes('Name') ? 175 : 80 } as DOMRect
+      })
+
+    try {
+      render(
+        <DataTable
+          columns={frozenColumns}
+          data={[{ id: '1', name: 'Alice', amount: 100 }]}
+          rowKey="id"
+          storageKey="frozen-painted-width"
+          frozenColumns={2}
+          preset="minimal"
+        />,
+      )
+
+      expect(screen.getByText('Amount').closest('th')).toHaveStyle({ left: '175px' })
+      expect(screen.getByText('100').closest('td')).toHaveStyle({ left: '175px' })
+    } finally {
+      rectSpy.mockRestore()
+    }
+  })
+
   it('recomputes later frozen offsets live after resizing a frozen column', () => {
     const frozenColumns: ColumnDef[] = [
       { id: 'name', label: 'Name', type: 'text', width: '120px' },
@@ -141,7 +172,9 @@ describe('Content', () => {
     )
 
     const nameHeader = screen.getByText('Name').closest('th')!
-    nameHeader.getBoundingClientRect = () => ({ width: 120 } as DOMRect)
+    nameHeader.getBoundingClientRect = () => ({
+      width: Number.parseFloat(nameHeader.style.width) || 120,
+    } as DOMRect)
     fireEvent.mouseDown(within(nameHeader).getByTitle('Drag to resize'), { clientX: 100 })
     fireEvent.mouseMove(document, { clientX: 180 })
     fireEvent.mouseUp(document)

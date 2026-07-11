@@ -65,6 +65,10 @@ function comparableView(view: DataTableView) {
   }
 }
 
+function viewsDiffer(left: DataTableView, right: DataTableView): boolean {
+  return JSON.stringify(comparableView(left)) !== JSON.stringify(comparableView(right))
+}
+
 export function useViews({
   storageKey,
   columns,
@@ -95,12 +99,22 @@ export function useViews({
       .map((suffix) => `${storageKey}-${suffix}`)
     const hasLegacyState = legacyKeys.some((key) => localStorage.getItem(key) !== null)
     if (Array.isArray(storedViews)) {
+      const activeView = storedDefault
+        ? storedViews.find((view) => view.id === storedDefault)
+        : undefined
+      const workingStateDiffers = activeView
+        ? viewsDiffer({
+            ...activeView,
+            sort: sort.getSnapshot(),
+            filter: filter.getSnapshot(),
+            groupBy: groupBy.getSnapshot(),
+            columns: columns.getSnapshot(),
+          }, activeView)
+        : false
       return {
         views: storedViews,
-        defaultViewId: storedDefault && storedViews.some((view) => view.id === storedDefault)
-          ? storedDefault
-          : null,
-        preserveWorkingState: hasLegacyState,
+        defaultViewId: activeView?.id ?? null,
+        preserveWorkingState: hasLegacyState && workingStateDiffers,
       }
     }
 
@@ -111,7 +125,12 @@ export function useViews({
     const currentFilter = filter.getSnapshot()
     const currentGroupBy = groupBy.getSnapshot()
     const legacySort = readJson<SortLevel[] | SortLevel>(`${storageKey}-sort`, currentSort)
-    const legacyGroupBy = readJson(`${storageKey}-groupby`, currentGroupBy)
+    const legacyGroupBy = readJson<Partial<GroupConfig> | null>(`${storageKey}-groupby`, currentGroupBy)
+    const migratedGroupBy = Array.isArray(legacyGroupBy?.groups)
+      ? legacyGroupBy.groups.length === 0 && currentGroupBy.groups.length > 0
+        ? currentGroupBy
+        : legacyGroupBy as GroupConfig
+      : currentGroupBy
     const migrated: DataTableView = {
       id: createViewId(),
       name: 'Default',
@@ -119,9 +138,7 @@ export function useViews({
       columns: readJson(`${storageKey}-columns`, currentColumns),
       sort: normalizeSort(legacySort),
       filter: readJson(`${storageKey}-filters`, currentFilter),
-      groupBy: legacyGroupBy.groups.length === 0 && currentGroupBy.groups.length > 0
-        ? currentGroupBy
-        : legacyGroupBy,
+      groupBy: migratedGroupBy,
       rowHeight: 'medium',
     }
     writeJson(viewsKey, [migrated])
@@ -138,13 +155,23 @@ export function useViews({
   viewsRef.current = views
   const [activeViewId, setActiveViewId] = useState<string | null>(initialState.defaultViewId)
   const [defaultViewId, setDefaultViewId] = useState<string | null>(initialState.defaultViewId)
-  const [rowHeight, setRowHeightState] = useState<DataTableRowHeight>('medium')
+  const [rowHeight, setRowHeightState] = useState<DataTableRowHeight>(() => (
+    initialState.views.find((view) => view.id === initialState.defaultViewId)?.rowHeight ?? 'medium'
+  ))
+  rowHeightRef.current = rowHeight
 
   const replaceViews = useCallback((next: DataTableView[]) => {
     viewsRef.current = next
     setViews(next)
     writeJson(viewsKey, next)
   }, [viewsKey])
+
+  const applyViewPresentation = useCallback((view: DataTableView) => {
+    if (view.viewMode && viewMode) viewMode.restore(view.viewMode)
+    const nextRowHeight = view.rowHeight ?? 'medium'
+    rowHeightRef.current = nextRowHeight
+    setRowHeightState(nextRowHeight)
+  }, [viewMode])
 
   const applyView = useCallback((view: DataTableView) => {
     columns.restore({
@@ -160,26 +187,34 @@ export function useViews({
       collapsed: view.groupBy.collapsed ?? [],
       showEmpty: view.groupBy.showEmpty,
     })
-    if (view.viewMode && viewMode) viewMode.restore(view.viewMode)
-    const nextRowHeight = view.rowHeight ?? 'medium'
-    rowHeightRef.current = nextRowHeight
-    setRowHeightState(nextRowHeight)
-  }, [columns, filter, groupBy, sort, viewMode])
+    applyViewPresentation(view)
+  }, [applyViewPresentation, columns, filter, groupBy, sort])
 
   const appliedDefaultRef = useRef(false)
   useEffect(() => {
-    if (appliedDefaultRef.current || !defaultViewId || initialState.preserveWorkingState) return
+    if (appliedDefaultRef.current || !defaultViewId) return
     appliedDefaultRef.current = true
     const defaultView = viewsRef.current.find((view) => view.id === defaultViewId)
-    if (defaultView) applyView(defaultView)
-  }, [applyView, defaultViewId, initialState.preserveWorkingState])
+    if (!defaultView) return
+    if (initialState.preserveWorkingState) applyViewPresentation(defaultView)
+    else applyView(defaultView)
+  }, [applyView, applyViewPresentation, defaultViewId, initialState.preserveWorkingState])
+
+  const persistActiveView = useCallback((id: string) => {
+    try {
+      localStorage.setItem(activeViewKey, id)
+    } catch {
+      // ignore quota errors
+    }
+  }, [activeViewKey])
 
   const saveAs = useCallback((name: string) => {
     const view = capture(createViewId(), name.trim())
     replaceViews([...viewsRef.current, view])
     setActiveViewId(view.id)
+    persistActiveView(view.id)
     return view
-  }, [capture, replaceViews])
+  }, [capture, persistActiveView, replaceViews])
 
   const update = useCallback((id: string) => {
     const existing = viewsRef.current.find((view) => view.id === id)
@@ -222,19 +257,16 @@ export function useViews({
     applyView(view)
     setActiveViewId(id)
     setDefaultViewId(id)
-    try {
-      localStorage.setItem(activeViewKey, id)
-    } catch {
-      // ignore quota errors
-    }
-  }, [activeViewKey, applyView])
+    persistActiveView(id)
+  }, [applyView, persistActiveView])
 
   const switchTo = useCallback((id: string) => {
     const view = viewsRef.current.find((candidate) => candidate.id === id)
     if (!view) return
     applyView(view)
     setActiveViewId(id)
-  }, [applyView])
+    persistActiveView(id)
+  }, [applyView, persistActiveView])
 
   const setRowHeight = useCallback((next: DataTableRowHeight) => {
     rowHeightRef.current = next
@@ -243,9 +275,7 @@ export function useViews({
 
   const activeView = views.find((view) => view.id === activeViewId)
   const currentSnapshot = capture(activeViewId ?? '', activeView?.name ?? '')
-  const isDirty = activeView
-    ? JSON.stringify(comparableView(currentSnapshot)) !== JSON.stringify(comparableView(activeView))
-    : false
+  const isDirty = activeView ? viewsDiffer(currentSnapshot, activeView) : false
 
   return {
     views,

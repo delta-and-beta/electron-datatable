@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { DragEvent, KeyboardEvent, ReactNode } from 'react'
 import { useDataTable } from '../context'
 import type { ColumnDef, GroupedSection, RowData } from '../types'
@@ -7,12 +7,14 @@ import { formatAggregateValue } from '../lib/format-aggregate'
 import { cn } from '../lib/utils'
 import { renderColumnValue } from './render-column-value'
 
-const UNCATEGORIZED = 'Uncategorized'
+const UNCATEGORIZED_KEY = '__dt_uncategorized__'
+const UNCATEGORIZED_LABEL = 'Uncategorized'
 
 interface Lane<T extends object> {
   key: string
   label: string
   records: T[]
+  synthetic?: boolean
 }
 
 function optionDetails<T extends object>(column: ColumnDef<T> | undefined) {
@@ -32,6 +34,21 @@ export function KanbanBoard<T extends object = RowData>() {
   const [dragOverLane, setDragOverLane] = useState<string | null>(null)
   const [draggingKey, setDraggingKey] = useState<string | null>(null)
   const [optimisticLanes, setOptimisticLanes] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setOptimisticLanes((current) => {
+      let next = current
+      for (const section of groupBy.groupedData) {
+        for (const row of laneRecords([section])) {
+          const key = String(asRecord(row)[rowKey])
+          if (current[key] !== section.key) continue
+          if (next === current) next = { ...current }
+          delete next[key]
+        }
+      }
+      return next
+    })
+  }, [groupBy.groupedData, rowKey])
 
   const lanes = useMemo<Lane<T>[]>(() => {
     if (!kanban || groupBy.levels.length === 0) return []
@@ -60,13 +77,18 @@ export function KanbanBoard<T extends object = RowData>() {
       }
     }
 
-    const result = order.map((key) => ({
+    const result: Lane<T>[] = order.map((key) => ({
       key,
       label: labels.get(key) ?? key,
       records: recordsByLane.get(key) ?? [],
     }))
     if (uncategorized.length > 0) {
-      result.push({ key: UNCATEGORIZED, label: UNCATEGORIZED, records: uncategorized })
+      result.push({
+        key: UNCATEGORIZED_KEY,
+        label: UNCATEGORIZED_LABEL,
+        records: uncategorized,
+        synthetic: true,
+      })
     }
     return result
   }, [columns, groupBy.groupedData, groupBy.levels, kanban, optimisticLanes, rowKey])
@@ -87,23 +109,29 @@ export function KanbanBoard<T extends object = RowData>() {
     const previousLane = optimisticLanes[key]
     setOptimisticLanes((previous) => ({ ...previous, [key]: toLane }))
 
-    try {
-      Promise.resolve(kanban.onMove(key, toLane)).catch(() => {
-        setOptimisticLanes((current) => {
-          if (current[key] !== toLane) return current
-          const next = { ...current }
-          if (hadPrevious) next[key] = previousLane
-          else delete next[key]
-          return next
-        })
-      })
-    } catch {
+    const clearMove = () => {
       setOptimisticLanes((current) => {
+        if (current[key] !== toLane) return current
+        const next = { ...current }
+        delete next[key]
+        return next
+      })
+    }
+    const rollbackMove = (error: unknown) => {
+      setOptimisticLanes((current) => {
+        if (current[key] !== toLane) return current
         const next = { ...current }
         if (hadPrevious) next[key] = previousLane
         else delete next[key]
         return next
       })
+      kanban.onMoveError?.(error, key, toLane)
+    }
+
+    try {
+      Promise.resolve(kanban.onMove(key, toLane)).then(clearMove, rollbackMove)
+    } catch (error) {
+      rollbackMove(error)
     }
   }
 
@@ -123,6 +151,7 @@ export function KanbanBoard<T extends object = RowData>() {
     <div className="h-full min-h-0 overflow-x-auto overflow-y-hidden bg-dt-bg text-dt-text">
       <div className="flex h-full min-w-max gap-3 p-4">
         {lanes.map((lane) => {
+          const laneMovable = movable && !lane.synthetic
           const aggregateColumn = kanban.laneAggregate
             ? columns.find((column) => column.id === kanban.laneAggregate?.field)
             : undefined
@@ -144,14 +173,14 @@ export function KanbanBoard<T extends object = RowData>() {
                   ? 'border-dt-text bg-dt-bg-secondary'
                   : 'border-dt-border',
               )}
-              onDragOver={movable ? (event) => {
+              onDragOver={laneMovable ? (event) => {
                 event.preventDefault()
                 setDragOverLane(lane.key)
               } : undefined}
-              onDragLeave={movable ? () => {
+              onDragLeave={laneMovable ? () => {
                 setDragOverLane((current) => current === lane.key ? null : current)
               } : undefined}
-              onDrop={movable ? (event) => handleDrop(event, lane.key) : undefined}
+              onDrop={laneMovable ? (event) => handleDrop(event, lane.key) : undefined}
             >
               <header className="shrink-0 border-b border-dt-border px-3 py-2">
                 <div className="truncate text-xs font-semibold">{lane.label}</div>

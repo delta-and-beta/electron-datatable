@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   shift-click range selection, and a floating action bar operating on the
   typed selected rows. Selection clears on filter/search/view-mode changes.
 
+### Fixed
+
+- Kanban moves now reconcile optimistic lanes with authoritative data, clear
+  completed moves, and report rejected or synchronously thrown moves through
+  `onMoveError`. The synthetic "Uncategorized" lane has an internal key and is
+  intentionally not a drop target.
+- Frozen-column offsets follow measured header geometry, including after
+  resize and column-set changes.
+- Named views persist the active view across save/switch and reload saved row
+  height and view mode without overwriting unsaved working facets. Malformed
+  legacy grouping state is ignored, and newly defined columns are appended
+  when older view snapshots are restored.
+
 ## [0.6.0] - 2026-07-11
 
 ### Added
@@ -46,8 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Portaled `Popover` primitive.** All toolbar panels (Sort, Filter, Group,
   Columns) now render through one portal-to-body popover with two-axis
   collision handling: vertical flip, horizontal clamp, re-measure on
-  scroll/resize/content change, focus trap, and Esc-to-close. Long panels no
-  longer overflow the viewport or clip under ancestor `overflow`.
+  scroll/resize/content change, Tab/Shift-Tab focus cycling, and Esc-to-close.
+  Panels are capped to the viewport and scroll internally, so long content no
+  longer overflows the viewport or clips under ancestor `overflow`.
 - **Frozen leading columns.** `frozenColumns?: number` on `DataTable`/
   `defineTable` pins the first N visible columns with cumulative sticky
   offsets, opaque themed backgrounds, and a right-edge divider. The frozen

@@ -33,7 +33,7 @@ describe('DataTable', () => {
     expect(screen.queryByRole('button', { name: 'Board view' })).not.toBeInTheDocument()
   })
 
-  it('seeds the first group from laneField and persists uncontrolled view mode', async () => {
+  it('seeds the first group from laneField and reloads the saved view mode', async () => {
     const kanbanColumns: ColumnDef<(typeof data)[number]>[] = [
       ...columns,
       { id: 'stage', label: 'Stage', type: 'text', options: ['Open', 'Won'] },
@@ -73,7 +73,8 @@ describe('DataTable', () => {
     first.unmount()
     render(<DataTable {...props} />)
 
-    expect(screen.getByRole('region', { name: 'Open lane' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Table view' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('region', { name: 'Open lane' })).not.toBeInTheDocument()
   })
 
   it('honors controlled viewMode while notifying toggle changes', () => {
