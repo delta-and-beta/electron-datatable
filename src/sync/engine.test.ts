@@ -5,6 +5,7 @@ import type { SyncAdapter, SyncPage, SyncTarget } from './types'
 function createMockAdapter(overrides?: Partial<SyncAdapter>): SyncAdapter {
   return {
     id: 'mock',
+    capabilities: { snapshotConsistent: true },
     describeSchema: vi.fn().mockResolvedValue({ columns: [] }),
     pull: vi.fn().mockResolvedValue({ rows: [], cursor: null, done: true }),
     ...overrides,
@@ -25,6 +26,26 @@ beforeEach(() => {
 })
 
 describe('SyncEngine', () => {
+  it('rejects destructive reconciliation for a non-snapshot source', () => {
+    const adapter = createMockAdapter({ capabilities: { snapshotConsistent: false } })
+
+    expect(() => new SyncEngine(adapter, createMockTarget(), {
+      externalIdField: 'id',
+      deletionPolicy: 'delete',
+    })).toThrow(
+      "deletionPolicy 'delete' requires a snapshot-consistent adapter; use 'markMissing' for this source",
+    )
+  })
+
+  it('allows destructive reconciliation for a snapshot-consistent source', () => {
+    const adapter = createMockAdapter({ capabilities: { snapshotConsistent: true } })
+
+    expect(() => new SyncEngine(adapter, createMockTarget(), {
+      externalIdField: 'id',
+      deletionPolicy: 'delete',
+    })).not.toThrow()
+  })
+
   it('dryRun pulls all pages and classifies rows without target writes', async () => {
     const pages = new Map<string | undefined, SyncPage>([
       [undefined, { rows: [{ id: 'existing' }, { id: 'new' }], cursor: 'page-2', done: false }],
@@ -93,6 +114,59 @@ describe('SyncEngine', () => {
       'bad: write failed',
       'Row is missing a valid id external id',
     ]))
+  })
+
+  it('wraps all writes in a target transaction and rolls back the failed run', async () => {
+    const calls: string[] = []
+    const adapter = createMockAdapter({
+      pull: vi.fn().mockResolvedValue({
+        rows: [{ id: 'first' }, { id: 'bad' }, { id: 'never' }],
+        cursor: null,
+        done: true,
+      }),
+    })
+    const target = createMockTarget({
+      begin: vi.fn(() => { calls.push('begin') }),
+      upsert: vi.fn(async (id: string) => {
+        calls.push(`upsert:${id}`)
+        if (id === 'bad') throw new Error('write failed')
+      }),
+      commitTx: vi.fn(() => { calls.push('commit') }),
+      rollback: vi.fn(() => { calls.push('rollback') }),
+    })
+
+    const result = await new SyncEngine(adapter, target, { externalIdField: 'id' }).commit()
+
+    expect(calls).toEqual(['begin', 'upsert:first', 'upsert:bad', 'rollback'])
+    expect(result).toEqual(expect.objectContaining({
+      created: 0,
+      updated: 0,
+      deleted: 0,
+      errors: ['bad: write failed'],
+    }))
+  })
+
+  it('stops best-effort writes after the first error when stopOnError is enabled', async () => {
+    const adapter = createMockAdapter({
+      pull: vi.fn().mockResolvedValue({
+        rows: [{ id: 'bad' }, { id: 'never' }],
+        cursor: null,
+        done: true,
+      }),
+    })
+    const target = createMockTarget({
+      upsert: vi.fn(async (id: string) => {
+        if (id === 'bad') throw new Error('write failed')
+      }),
+    })
+
+    const result = await new SyncEngine(adapter, target, {
+      externalIdField: 'id',
+      stopOnError: true,
+    }).commit()
+
+    expect(target.upsert).toHaveBeenCalledOnce()
+    expect(result.errors).toEqual(['bad: write failed'])
   })
 
   it.each([
@@ -177,6 +251,30 @@ describe('SyncEngine', () => {
     expect(onProgress.mock.calls.map(([progress]) => progress.current)).toEqual([0, 0, 0, 0, 0])
   })
 
+  it('persists an exact terminal null cursor so the next run starts fresh', async () => {
+    const firstAdapter = createMockAdapter({
+      pull: vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'first' }], cursor: 'dynamo-page-2', done: false })
+        .mockResolvedValueOnce({ rows: [{ id: 'second' }], cursor: null, done: true }),
+    })
+
+    const firstResult = await new SyncEngine(
+      firstAdapter,
+      createMockTarget(),
+      { externalIdField: 'id' },
+    ).commit()
+
+    const nextAdapter = createMockAdapter()
+    await new SyncEngine(
+      nextAdapter,
+      createMockTarget(),
+      { externalIdField: 'id', watermark: firstResult.cursor ?? undefined },
+    ).dryRun()
+
+    expect(firstResult.cursor).toBeNull()
+    expect(nextAdapter.pull).toHaveBeenCalledWith(undefined)
+  })
+
   it('aborts page pulling and returns the adapter error', async () => {
     const adapter = createMockAdapter({
       pull: vi.fn()
@@ -209,5 +307,23 @@ describe('createPollingHandle', () => {
     expect(handle.isRunning()).toBe(false)
     vi.advanceTimersByTime(100)
     expect(fn).toHaveBeenCalledTimes(2)
+  })
+
+  it('skips ticks while the previous callback promise is pending', async () => {
+    vi.useFakeTimers()
+    let resolve: (() => void) | undefined
+    const fn = vi.fn(() => new Promise<void>((done) => { resolve = done }))
+    const handle = createPollingHandle(fn, 100)
+
+    handle.start()
+    await vi.advanceTimersByTimeAsync(350)
+    expect(fn).toHaveBeenCalledOnce()
+
+    resolve?.()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(fn).toHaveBeenCalledTimes(2)
+
+    handle.stop()
   })
 })

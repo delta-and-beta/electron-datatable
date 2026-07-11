@@ -66,13 +66,13 @@ describe('PostgresSyncAdapter', () => {
       watermarkColumn: 'changed_at',
     })
 
-    const page = await adapter.pull('2026-07-11T09:00:00Z')
+    const page = await adapter.pull('{"watermark":"2026-07-11T09:00:00Z","key":"previous"}')
 
     expect(query).toHaveBeenCalledWith(
-      expect.stringContaining('WHERE "changed_at" > $1 ORDER BY "changed_at"'),
-      ['2026-07-11T09:00:00Z', 100],
+      expect.stringContaining('WHERE "changed_at" > $1 OR ("changed_at" = $2 AND "id" > $3) ORDER BY "changed_at", "id"'),
+      ['2026-07-11T09:00:00Z', '2026-07-11T09:00:00Z', 'previous', 100],
     )
-    expect(page.cursor).toBe('2026-07-11T10:00:00Z')
+    expect(page.cursor).toBe('{"watermark":"2026-07-11T10:00:00Z","key":"a"}')
   })
 
   it('supports a configured key column independently of the external id', async () => {
@@ -91,5 +91,36 @@ describe('PostgresSyncAdapter', () => {
       ['6', 100],
     )
     expect(page.cursor).toBe('7')
+  })
+
+  it('uses a composite watermark and external-id cursor across a three-row tie', async () => {
+    const tiedRows = [
+      { id: 'a', changed_at: '2026-07-11T10:00:00Z' },
+      { id: 'b', changed_at: '2026-07-11T10:00:00Z' },
+      { id: 'c', changed_at: '2026-07-11T10:00:00Z' },
+    ]
+    const query = vi.fn((_sql: string, params?: unknown[]) => Promise.resolve({
+      rows: params?.length === 1
+        ? tiedRows.slice(0, 2)
+        : tiedRows.filter((row) => row.id > String(params?.[2])).slice(0, 2),
+    }))
+    const adapter = new PostgresSyncAdapter({
+      client: createMockClient({ query }),
+      table: 'transactions',
+      externalIdColumn: 'id',
+      watermarkColumn: 'changed_at',
+      pageSize: 2,
+    })
+
+    const first = await adapter.pull()
+    const second = await adapter.pull(first.cursor ?? undefined)
+
+    expect([...first.rows, ...second.rows].map((row) => row.id)).toEqual(['a', 'b', 'c'])
+    expect(JSON.parse(first.cursor ?? '')).toEqual({ watermark: '2026-07-11T10:00:00Z', key: 'b' })
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('WHERE "changed_at" > $1 OR ("changed_at" = $2 AND "id" > $3) ORDER BY "changed_at", "id"'),
+      ['2026-07-11T10:00:00Z', '2026-07-11T10:00:00Z', 'b', 2],
+    )
   })
 })

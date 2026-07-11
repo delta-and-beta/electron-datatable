@@ -18,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   schemas to column definitions; `SyncStatusChip`/`useSyncStatus` surface sync
   state in the toolbar. Core never imports from `/sync` (boundary-tested).
 
+### Changed
+
+- `SyncTarget` supports transactional targets through `begin`, `commitTx`, and
+  `rollback`; targets without all three hooks remain best-effort per row and can
+  opt into `stopOnError`.
+- SQLite, PostgreSQL, and BigQuery watermark paging uses composite keyset cursors
+  `(watermark, external ID)`, including deterministic tie handling without
+  BigQuery offsets.
+- DynamoDB exposes one structural `scan()` client shape plus
+  `fromDocumentClient()` for consumer-supplied document clients and command
+  constructors. Adapter snapshot capabilities prevent destructive deletion for
+  non-snapshot DynamoDB scans, and typed cursors preserve binary keys.
+- SQLite `select` accepts identifier arrays only; raw SQL strings are rejected.
+
 ## [0.7.0] - 2026-07-11
 
 ### Added

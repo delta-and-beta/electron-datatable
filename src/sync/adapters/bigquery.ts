@@ -27,27 +27,24 @@ interface InformationSchemaColumn {
 
 interface BigQueryCursor {
   watermark: unknown
-  offset: number
+  key: unknown
 }
 
 function quoteIdentifier(identifier: string): string {
   return `\`${identifier.replace(/`/g, '\\`')}\``
 }
 
-function cursorEquals(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
-}
-
 function parseCursor(cursor: SyncCursor): BigQueryCursor {
   const parsed = JSON.parse(cursor) as Partial<BigQueryCursor>
-  if (!('watermark' in parsed) || typeof parsed.offset !== 'number') {
+  if (!('watermark' in parsed) || !('key' in parsed)) {
     throw new TypeError('BigQuery sync cursor is invalid')
   }
-  return { watermark: parsed.watermark, offset: parsed.offset }
+  return { watermark: parsed.watermark, key: parsed.key }
 }
 
 export class BigQuerySyncAdapter implements SyncAdapter {
   readonly id: string
+  readonly capabilities = { snapshotConsistent: true } as const
   private readonly pageSize: number
 
   constructor(private readonly options: BigQuerySyncAdapterOptions) {
@@ -79,15 +76,17 @@ ORDER BY ordinal_position`,
   async pull(cursor?: SyncCursor): Promise<SyncPage> {
     const state = cursor === undefined ? undefined : parseCursor(cursor)
     const watermark = quoteIdentifier(this.options.watermarkColumn)
+    const externalIdColumn = this.options.externalIdColumn ?? 'id'
+    const externalId = quoteIdentifier(externalIdColumn)
     const table = this.options.project
       ? `${this.options.project}.${this.options.dataset}.${this.options.table}`
       : `${this.options.dataset}.${this.options.table}`
     const query = state === undefined
-      ? `SELECT * FROM ${quoteIdentifier(table)} ORDER BY ${watermark} LIMIT @pageSize`
-      : `SELECT * FROM ${quoteIdentifier(table)} WHERE ${watermark} >= @watermark ORDER BY ${watermark} LIMIT @pageSize OFFSET @offset`
+      ? `SELECT * FROM ${quoteIdentifier(table)} ORDER BY ${watermark}, ${externalId} LIMIT @pageSize`
+      : `SELECT * FROM ${quoteIdentifier(table)} WHERE ${watermark} > @watermark OR (${watermark} = @watermark AND ${externalId} > @key) ORDER BY ${watermark}, ${externalId} LIMIT @pageSize`
     const params = state === undefined
       ? { pageSize: this.pageSize }
-      : { watermark: state.watermark, offset: state.offset, pageSize: this.pageSize }
+      : { watermark: state.watermark, key: state.key, pageSize: this.pageSize }
     const [rows] = await this.options.client.query({ query, params })
 
     if (rows.length === 0) {
@@ -99,18 +98,14 @@ ORDER BY ordinal_position`,
       throw new Error(`BigQuery sync watermark column ${this.options.watermarkColumn} is missing`)
     }
 
-    let trailingCount = 0
-    for (let index = rows.length - 1; index >= 0; index -= 1) {
-      if (!cursorEquals(rows[index]?.[this.options.watermarkColumn], lastWatermark)) break
-      trailingCount += 1
+    const key = rows[rows.length - 1]?.[externalIdColumn]
+    if (key === undefined || key === null) {
+      throw new Error(`BigQuery sync external id column ${externalIdColumn} is missing`)
     }
-    const offset = state && cursorEquals(state.watermark, lastWatermark)
-      ? state.offset + trailingCount
-      : trailingCount
 
     return {
       rows,
-      cursor: JSON.stringify({ watermark: lastWatermark, offset }),
+      cursor: JSON.stringify({ watermark: lastWatermark, key }),
       done: false,
     }
   }

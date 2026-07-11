@@ -22,6 +22,8 @@ describe('inferColumns', () => {
     ['json', 'custom'],
     ['jsonb', 'custom'],
     ['struct', 'custom'],
+    ['custom', 'custom'],
+    ['tags', 'tags'],
     ['unknown_vendor_type', 'text'],
   ] as const)('maps %s to %s', (sourceType, type) => {
     expect(inferColumns({ columns: [{ name: 'value', sourceType }] })).toEqual([

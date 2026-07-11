@@ -38,6 +38,18 @@ describe('SyncStatusChip', () => {
     expect(screen.getByLabelText('Sync in progress')).toHaveClass('animate-spin')
   })
 
+  it('renders active progress ahead of a stale failed result', () => {
+    render(
+      <SyncStatusChip
+        progress={{ phase: 'writing', current: 3, total: 10 }}
+        result={{ ...successfulResult, errors: ['previous run failed'] }}
+      />,
+    )
+
+    expect(screen.getByText('Writing 3/10')).toBeInTheDocument()
+    expect(screen.queryByText('Sync failed')).not.toBeInTheDocument()
+  })
+
   it('renders an error status with its message as a tooltip', () => {
     render(
       <SyncStatusChip

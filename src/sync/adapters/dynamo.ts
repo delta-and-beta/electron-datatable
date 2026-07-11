@@ -1,4 +1,4 @@
-import type { SourceColumn, SourceSchema, SyncAdapter, SyncCursor, SyncPage } from '../types'
+import type { SourceColumn, SourceColumnType, SourceSchema, SyncAdapter, SyncCursor, SyncPage } from '../types'
 
 export interface DynamoScanInput {
   TableName: string
@@ -12,8 +12,35 @@ export interface DynamoScanOutput {
 }
 
 export interface DynamoClient {
-  scan?(input: DynamoScanInput): Promise<DynamoScanOutput>
-  send?(input: DynamoScanInput): Promise<DynamoScanOutput>
+  scan(input: DynamoScanInput): Promise<DynamoScanOutput>
+}
+
+export interface DynamoDocumentClient<Command> {
+  send(command: Command): Promise<DynamoScanOutput>
+}
+
+export interface DynamoScanCommandConstructor<Command> {
+  new(input: DynamoScanInput): Command
+}
+
+/**
+ * Adapts an AWS document client without importing an AWS driver.
+ *
+ * @example
+ * ```ts
+ * import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb'
+ * const client = fromDocumentClient(DynamoDBDocumentClient.from(dynamo), ScanCommand)
+ * ```
+ */
+export function fromDocumentClient<Command>(
+  documentClient: DynamoDocumentClient<Command>,
+  ScanCommandCtor: DynamoScanCommandConstructor<Command>,
+): DynamoClient {
+  return {
+    scan(input) {
+      return documentClient.send(new ScanCommandCtor(input))
+    },
+  }
 }
 
 export interface DynamoSyncAdapterOptions {
@@ -24,13 +51,16 @@ export interface DynamoSyncAdapterOptions {
   pageSize?: number
 }
 
-function sourceType(value: unknown): string {
+function sourceType(value: unknown): SourceColumnType {
   if (value === null) return 'null'
   if (Array.isArray(value)) {
-    return value.every((entry) => typeof entry === 'string') ? 'ARRAY<STRING>' : 'array'
+    return value.every((entry) => typeof entry === 'string') ? 'tags' : 'custom'
   }
   if (value instanceof Uint8Array) return 'binary'
-  if (typeof value === 'object') return 'map'
+  if (value instanceof Set) {
+    return [...value].every((entry) => typeof entry === 'string') ? 'tags' : 'custom'
+  }
+  if (typeof value === 'object') return 'custom'
   if (typeof value === 'string') return 'string'
   if (typeof value === 'number') return 'number'
   if (typeof value === 'boolean') return 'boolean'
@@ -55,8 +85,56 @@ function inferSchema(items: Record<string, unknown>[]): SourceColumn[] {
   }))
 }
 
+type EncodedKeyAttribute =
+  | { type: 'string', value: string }
+  | { type: 'number', value: number }
+  | { type: 'binary', value: string }
+
+interface EncodedCursor {
+  version: 1
+  key: Record<string, EncodedKeyAttribute>
+}
+
+function binaryToBase64(value: Uint8Array): string {
+  return btoa(String.fromCharCode(...value))
+}
+
+function base64ToBinary(value: string): Uint8Array {
+  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0))
+}
+
+function serializeCursor(key: Record<string, unknown>): SyncCursor {
+  const encoded: Record<string, EncodedKeyAttribute> = {}
+  for (const [name, value] of Object.entries(key)) {
+    if (typeof value === 'bigint') {
+      throw new TypeError(
+        `Dynamo cursor cannot serialize BigInt key attribute "${name}"; configure the document client to return a string or number`,
+      )
+    }
+    if (typeof value === 'string') encoded[name] = { type: 'string', value }
+    else if (typeof value === 'number') encoded[name] = { type: 'number', value }
+    else if (value instanceof Uint8Array) encoded[name] = { type: 'binary', value: binaryToBase64(value) }
+    else throw new TypeError(`Dynamo cursor key attribute "${name}" must be a string, number, or Uint8Array`)
+  }
+  return JSON.stringify({ version: 1, key: encoded } satisfies EncodedCursor)
+}
+
+function deserializeCursor(cursor: SyncCursor): Record<string, unknown> {
+  const parsed = JSON.parse(cursor) as Partial<EncodedCursor>
+  if (parsed.version !== 1 || typeof parsed.key !== 'object' || parsed.key === null) {
+    throw new TypeError('Dynamo sync cursor is invalid')
+  }
+
+  return Object.fromEntries(Object.entries(parsed.key).map(([name, attribute]) => {
+    if (attribute.type === 'string' || attribute.type === 'number') return [name, attribute.value]
+    if (attribute.type === 'binary') return [name, base64ToBinary(attribute.value)]
+    throw new TypeError(`Dynamo sync cursor has an invalid type for key attribute "${name}"`)
+  }))
+}
+
 export class DynamoSyncAdapter implements SyncAdapter {
   readonly id: string
+  readonly capabilities = { snapshotConsistent: false } as const
   private readonly pageSize: number
 
   constructor(private readonly options: DynamoSyncAdapterOptions) {
@@ -65,8 +143,15 @@ export class DynamoSyncAdapter implements SyncAdapter {
   }
 
   async describeSchema(): Promise<SourceSchema> {
-    const page = await this.scan({ TableName: this.options.table, Limit: this.pageSize })
-    return { columns: inferSchema(page.Items ?? []) }
+    const page = await this.options.client.scan({ TableName: this.options.table, Limit: this.pageSize })
+    const items = page.Items ?? []
+    if (items.length === 0) {
+      return {
+        columns: [],
+        warning: `Dynamo table "${this.options.table}" returned no sample items; schema inference produced no columns`,
+      }
+    }
+    return { columns: inferSchema(items) }
   }
 
   async pull(cursor?: SyncCursor): Promise<SyncPage> {
@@ -74,12 +159,12 @@ export class DynamoSyncAdapter implements SyncAdapter {
       TableName: this.options.table,
       Limit: this.pageSize,
     }
-    if (cursor !== undefined) input.ExclusiveStartKey = JSON.parse(cursor) as Record<string, unknown>
+    if (cursor !== undefined) input.ExclusiveStartKey = deserializeCursor(cursor)
 
-    const page = await this.scan(input)
+    const page = await this.options.client.scan(input)
     const nextCursor = page.LastEvaluatedKey === undefined
       ? null
-      : JSON.stringify(page.LastEvaluatedKey)
+      : serializeCursor(page.LastEvaluatedKey)
 
     return {
       rows: page.Items ?? [],
@@ -88,9 +173,4 @@ export class DynamoSyncAdapter implements SyncAdapter {
     }
   }
 
-  private scan(input: DynamoScanInput): Promise<DynamoScanOutput> {
-    if (this.options.client.scan) return this.options.client.scan(input)
-    if (this.options.client.send) return this.options.client.send(input)
-    throw new TypeError('Dynamo adapter requires a scan or send client method')
-  }
 }

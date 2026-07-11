@@ -28,14 +28,33 @@ describe('useSyncStatus', () => {
     expect(hook.current.progress).toBeNull()
     expect(hook.current.result).toBeNull()
 
-    act(() => hook.current.setProgress(progress))
+    let runId = 0
+    act(() => { runId = hook.current.startRun() })
+    act(() => hook.current.setProgress(runId, progress))
     expect(hook.current.progress).toEqual(progress)
 
-    act(() => hook.current.setResult(result))
+    act(() => hook.current.setResult(runId, result))
     expect(hook.current.result).toEqual(result)
 
     act(() => hook.current.reset())
     expect(hook.current.progress).toBeNull()
+    expect(hook.current.result).toBeNull()
+  })
+
+  it('clears prior state and ignores late setters from an older run', () => {
+    const { result: hook } = renderHook(() => useSyncStatus())
+    let oldRunId = 0
+    let currentRunId = 0
+
+    act(() => { oldRunId = hook.current.startRun() })
+    act(() => hook.current.setResult(oldRunId, { ...result, errors: ['old failure'] }))
+    act(() => { currentRunId = hook.current.startRun() })
+    act(() => hook.current.setProgress(currentRunId, progress))
+    act(() => hook.current.setProgress(oldRunId, { phase: 'error', current: 0, message: 'late error' }))
+    act(() => hook.current.setResult(oldRunId, { ...result, errors: ['late failure'] }))
+
+    expect(hook.current.runId).toBe(currentRunId)
+    expect(hook.current.progress).toEqual(progress)
     expect(hook.current.result).toBeNull()
   })
 })

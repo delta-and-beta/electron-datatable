@@ -52,16 +52,16 @@ describe('BigQuerySyncAdapter', () => {
     const second = await adapter.pull(first.cursor ?? undefined)
     const third = await adapter.pull(second.cursor ?? undefined)
 
-    expect(JSON.parse(first.cursor ?? '')).toEqual({ watermark: '2026-07-11T10:00:00Z', offset: 1 })
-    expect(JSON.parse(second.cursor ?? '')).toEqual({ watermark: '2026-07-11T11:00:00Z', offset: 1 })
+    expect(JSON.parse(first.cursor ?? '')).toEqual({ watermark: '2026-07-11T10:00:00Z', key: 'a' })
+    expect(JSON.parse(second.cursor ?? '')).toEqual({ watermark: '2026-07-11T11:00:00Z', key: 'b' })
     expect(third).toEqual({ rows: [], cursor: second.cursor, done: true })
     expect(query).toHaveBeenNthCalledWith(2, {
-      query: expect.stringContaining('WHERE `changed_at` >= @watermark'),
-      params: { watermark: '2026-07-11T10:00:00Z', offset: 1, pageSize: 1 },
+      query: expect.stringContaining('WHERE `changed_at` > @watermark OR (`changed_at` = @watermark AND `id` > @key)'),
+      params: { watermark: '2026-07-11T10:00:00Z', key: 'a', pageSize: 1 },
     })
   })
 
-  it('uses the cursor offset to resume rows sharing a watermark', async () => {
+  it('uses the cursor key to resume rows sharing a watermark', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce([[
         { id: 'a', changed_at: '2026-07-11T10:00:00Z' },
@@ -82,11 +82,44 @@ describe('BigQuerySyncAdapter', () => {
     const first = await adapter.pull()
     const second = await adapter.pull(first.cursor ?? undefined)
 
-    expect(JSON.parse(first.cursor ?? '')).toEqual({ watermark: '2026-07-11T10:00:00Z', offset: 2 })
-    expect(JSON.parse(second.cursor ?? '')).toEqual({ watermark: '2026-07-11T11:00:00Z', offset: 1 })
+    expect(JSON.parse(first.cursor ?? '')).toEqual({ watermark: '2026-07-11T10:00:00Z', key: 'b' })
+    expect(JSON.parse(second.cursor ?? '')).toEqual({ watermark: '2026-07-11T11:00:00Z', key: 'd' })
     expect(query).toHaveBeenNthCalledWith(2, {
-      query: expect.stringContaining('OFFSET @offset'),
-      params: { watermark: '2026-07-11T10:00:00Z', offset: 2, pageSize: 2 },
+      query: expect.not.stringContaining('OFFSET'),
+      params: { watermark: '2026-07-11T10:00:00Z', key: 'b', pageSize: 2 },
     })
+  })
+
+  it('uses a composite watermark and external-id cursor across a three-row tie without OFFSET', async () => {
+    const tiedRows = [
+      { id: 'a', changed_at: '2026-07-11T10:00:00Z' },
+      { id: 'b', changed_at: '2026-07-11T10:00:00Z' },
+      { id: 'c', changed_at: '2026-07-11T10:00:00Z' },
+    ]
+    const query = vi.fn((options: { params?: unknown }) => {
+      const params = options.params as { key?: string }
+      return Promise.resolve([params.key === undefined
+        ? tiedRows.slice(0, 2)
+        : tiedRows.filter((row) => row.id > params.key).slice(0, 2)] as [Record<string, unknown>[]])
+    })
+    const adapter = new BigQuerySyncAdapter({
+      client: createMockClient({ query }),
+      dataset: 'ledger',
+      table: 'transactions',
+      externalIdColumn: 'id',
+      watermarkColumn: 'changed_at',
+      pageSize: 2,
+    })
+
+    const first = await adapter.pull()
+    const second = await adapter.pull(first.cursor ?? undefined)
+
+    expect([...first.rows, ...second.rows].map((row) => row.id)).toEqual(['a', 'b', 'c'])
+    expect(JSON.parse(first.cursor ?? '')).toEqual({ watermark: '2026-07-11T10:00:00Z', key: 'b' })
+    expect(query).toHaveBeenNthCalledWith(2, {
+      query: expect.stringContaining('WHERE `changed_at` > @watermark OR (`changed_at` = @watermark AND `id` > @key)'),
+      params: { watermark: '2026-07-11T10:00:00Z', key: 'b', pageSize: 2 },
+    })
+    expect(query.mock.calls[1]?.[0].query).not.toContain('OFFSET')
   })
 })
