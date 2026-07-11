@@ -1,5 +1,5 @@
-import { SQLiteSyncAdapter } from './sync'
-import type { SQLiteClient, SourceColumnType, SyncTarget } from './sync'
+import { AirtableSyncAdapter, SQLiteSyncAdapter } from './sync'
+import type { AirtableClient, AirtableSyncAdapterOptions, SQLiteClient, SourceColumnType, SyncTarget } from './sync'
 import { describe, expect, it } from 'vitest'
 
 const synchronousTarget = {
@@ -35,6 +35,14 @@ void assertRawSelectIsRejected
 
 const sourceColumnType: SourceColumnType = 'tags'
 void sourceColumnType
+
+const airtableClient = { async request(_path: string, _params?: Record<string, string>) { return {} } } satisfies AirtableClient
+const airtableOptions = {
+  client: airtableClient,
+  baseId: 'appBase',
+  table: 'Companies',
+} satisfies AirtableSyncAdapterOptions
+new AirtableSyncAdapter(airtableOptions)
 
 describe('SyncTarget type compatibility', () => {
   it('accepts synchronous and asynchronous write implementations', () => {

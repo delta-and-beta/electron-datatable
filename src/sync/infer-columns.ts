@@ -9,6 +9,7 @@ const customTypes = /^(?:json|jsonb|struct)\b/i
 const adapterTypeMap = {
   string: 'text',
   number: 'number',
+  date: 'date',
   boolean: 'text',
   tags: 'tags',
   custom: 'custom',
