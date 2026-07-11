@@ -31,6 +31,12 @@ export interface GroupHeaderProps<T extends object = RowData> {
   renderCell?: (column: ColumnDef<T>, value: unknown) => React.ReactNode
   /** Extra columns prepended before user columns (e.g., attachment column) */
   extraColSpan?: number
+  /** Widths resolved from persisted resize state before static column widths */
+  resolvedWidths?: Record<string, string | number | undefined>
+  /** Sticky-left offsets keyed by frozen visible column id */
+  frozenOffsets?: Record<string, number>
+  /** Last frozen column, which receives the frozen-region divider */
+  lastFrozenId?: string
 }
 
 /* ---------------------------------------------------------------------------
@@ -96,6 +102,9 @@ export function GroupHeader<T extends object = RowData>({
   stickyOffset = 39,
   renderCell,
   extraColSpan = 0,
+  resolvedWidths = {},
+  frozenOffsets = {},
+  lastFrozenId,
 }: GroupHeaderProps<T>) {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLTableRowElement>(null)
@@ -228,6 +237,10 @@ export function GroupHeader<T extends object = RowData>({
         )}
         {columns.map((col, idx) => {
           const isFirst = idx === 0
+          const isFrozen = Object.prototype.hasOwnProperty.call(frozenOffsets, col.id)
+          const isFrozenEdge = col.id === lastFrozenId
+          const frozenStyle = isFrozen ? { left: frozenOffsets[col.id] } : {}
+          const width = resolvedWidths[col.id] ?? col.width
 
           // The first cell is always reserved for the group label (chevron +
           // badge + key + count), even if the underlying column is aggregatable.
@@ -238,13 +251,16 @@ export function GroupHeader<T extends object = RowData>({
                 className={cn(
                   'sticky pr-3 border-b border-dt-border transition-colors duration-150',
                   idx < columns.length - 1 && 'border-r border-dt-border',
+                  isFrozen && 'dt-group-frozen-cell z-20',
+                  isFrozenEdge && 'dt-frozen-edge',
                 )}
                 style={{
                   top: stickyOffset,
+                  ...frozenStyle,
                   paddingLeft,
                   paddingTop: padY,
                   paddingBottom: padY,
-                  width: col.width,
+                  width,
                   backgroundColor: bgColor,
                   boxShadow: `inset 3px 0 0 0 ${accentColor}`,
                 }}
@@ -292,10 +308,13 @@ export function GroupHeader<T extends object = RowData>({
                   align === 'center' && 'text-center',
                   value < 0 ? 'text-dt-negative' : 'text-dt-positive',
                   idx < columns.length - 1 && 'border-r border-dt-border',
+                  isFrozen && 'dt-group-frozen-cell z-20',
+                  isFrozenEdge && 'dt-frozen-edge',
                 )}
                 style={{
                   top: stickyOffset,
-                  width: col.width,
+                  ...frozenStyle,
+                  width,
                   backgroundColor: bgColor,
                   paddingTop: padY,
                   paddingBottom: padY,
@@ -319,10 +338,13 @@ export function GroupHeader<T extends object = RowData>({
                 align === 'right' && 'text-right',
                 align === 'center' && 'text-center',
                 idx < columns.length - 1 && 'border-r border-dt-border',
+                isFrozen && 'dt-group-frozen-cell z-20',
+                isFrozenEdge && 'dt-frozen-edge',
               )}
               style={{
                 top: stickyOffset,
-                width: col.width,
+                ...frozenStyle,
+                width,
                 backgroundColor: bgColor,
                 paddingTop: padY,
                 paddingBottom: padY,

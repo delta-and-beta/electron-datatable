@@ -21,6 +21,7 @@ import { FilterConfigPanel } from './toolbar/FilterConfigPanel'
 import { SortControl } from './toolbar/SortControl'
 import { GroupHeader } from './headers/GroupHeader'
 import { DataTableErrorBoundary } from './ErrorBoundary'
+import { Popover } from './Popover'
 import { devWarn } from '../lib/dev-warn'
 import { cn } from '../lib/utils'
 import { ACTIONS_COLUMN_ID, makeActionsColumn } from '../actions'
@@ -32,6 +33,7 @@ function DataTableRoot<T extends object = RowData>({
   actions,
   rowKey,
   storageKey = 'dt',
+  frozenColumns = 0,
   preset = 'none',
   attachmentAdapter,
   defaultSort,
@@ -90,7 +92,7 @@ function DataTableRoot<T extends object = RowData>({
   })
 
   // Columns
-  const columnState = useColumns({ columns: configurableColumns, storageKey })
+  const columnState = useColumns({ columns: configurableColumns, storageKey, frozenColumns })
 
   // Group-by
   const sumFields = tableColumns
@@ -276,53 +278,57 @@ function FullPresetToolbar({
       <Search className="w-80" />
       {toolbarExtra}
       <div className="flex items-center gap-3">
-        <div className="relative">
-          <FilterToolbarButton
+        <Popover
+          open={filterMenuOpen}
+          onOpenChange={setFilterMenuOpen}
+          trigger={<FilterToolbarButton
             activeCount={filter.activeCount}
             enabled={filter.enabled}
             isOpen={filterMenuOpen}
-            onClick={() => setFilterMenuOpen(!filterMenuOpen)}
             onToggleEnabled={filter.setEnabled}
+          />}
+          aria-label="Filter configuration"
+          contentClassName="w-[520px]"
+        >
+          <FilterConfigPanel
+            root={filter.root}
+            columns={columns}
+            enabled={filter.enabled}
+            onSetEnabled={filter.setEnabled}
+            onAddCondition={filter.addCondition}
+            onRemoveCondition={filter.removeCondition}
+            onUpdateCondition={filter.updateCondition}
+            onAddGroup={filter.addGroup}
+            onRemoveGroup={filter.removeGroup}
+            onUpdateConjunction={filter.updateConjunction}
+            onClearAll={filter.clearAll}
+            onClose={() => setFilterMenuOpen(false)}
           />
-          {filterMenuOpen && (
-            <FilterConfigPanel
-              root={filter.root}
-              columns={columns}
-              enabled={filter.enabled}
-              onSetEnabled={filter.setEnabled}
-              onAddCondition={filter.addCondition}
-              onRemoveCondition={filter.removeCondition}
-              onUpdateCondition={filter.updateCondition}
-              onAddGroup={filter.addGroup}
-              onRemoveGroup={filter.removeGroup}
-              onUpdateConjunction={filter.updateConjunction}
-              onClearAll={filter.clearAll}
-              onClose={() => setFilterMenuOpen(false)}
-            />
-          )}
-        </div>
-        <div className="relative">
-          <GroupByToolbarButton
+        </Popover>
+        <Popover
+          open={groupMenuOpen}
+          onOpenChange={setGroupMenuOpen}
+          trigger={<GroupByToolbarButton
             activeCount={groupBy.levels.length}
             isOpen={groupMenuOpen}
-            onClick={() => setGroupMenuOpen(!groupMenuOpen)}
+          />}
+          aria-label="Group by configuration"
+          contentClassName="w-[520px]"
+        >
+          <GroupByConfigPanel
+            levels={groupBy.levels}
+            columns={groupableColumns}
+            onAddGroup={groupBy.addGroup}
+            onRemoveGroup={groupBy.removeGroup}
+            onUpdateGroup={groupBy.updateGroup}
+            onReorderGroups={groupBy.reorderGroups}
+            onCollapseAll={groupBy.collapseAll}
+            onExpandAll={groupBy.expandAll}
+            showEmpty={groupBy.showEmpty}
+            onToggleShowEmpty={groupBy.setShowEmpty}
+            onClose={() => setGroupMenuOpen(false)}
           />
-          {groupMenuOpen && (
-            <GroupByConfigPanel
-              levels={groupBy.levels}
-              columns={groupableColumns}
-              onAddGroup={groupBy.addGroup}
-              onRemoveGroup={groupBy.removeGroup}
-              onUpdateGroup={groupBy.updateGroup}
-              onReorderGroups={groupBy.reorderGroups}
-              onCollapseAll={groupBy.collapseAll}
-              onExpandAll={groupBy.expandAll}
-              showEmpty={groupBy.showEmpty}
-              onToggleShowEmpty={groupBy.setShowEmpty}
-              onClose={() => setGroupMenuOpen(false)}
-            />
-          )}
-        </div>
+        </Popover>
         <SortControl levels={sort.sortLevels} columns={columns} onChange={sort.setSortLevels} />
         <ColumnToggle />
       </div>

@@ -5,7 +5,7 @@ interface FilterToolbarButtonProps {
   activeCount: number
   enabled: boolean
   isOpen: boolean
-  onClick: () => void
+  onClick?: () => void
   onToggleEnabled: (enabled: boolean) => void
   className?: string
 }

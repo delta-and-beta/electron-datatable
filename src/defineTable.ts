@@ -7,6 +7,7 @@ type ColumnConfig<T extends object> = Omit<ColumnDef<T>, 'id'>
 interface TableConfig<T extends object> {
   rowKey: keyof T & string
   storageKey?: string
+  frozenColumns?: number
   columns: { [K in keyof T]?: ColumnConfig<T> }
   actions?: RowAction<T>[]
   defaults?: {
@@ -21,6 +22,7 @@ interface TableDefinition<T extends object> {
   actions?: RowAction<T>[]
   rowKey: keyof T & string
   storageKey?: string
+  frozenColumns?: number
   defaultSort?: { field: string; direction: 'asc' | 'desc' }
   defaultGroupBy?: GroupLevel[]
 }
@@ -52,6 +54,7 @@ export function defineTable<T extends object>(config: TableConfig<T>): TableDefi
     actions: config.actions,
     rowKey: config.rowKey,
     storageKey: config.storageKey,
+    frozenColumns: config.frozenColumns,
     defaultSort: config.defaults?.sort
       ? { field: config.defaults.sort.field, direction: config.defaults.sort.direction }
       : undefined,

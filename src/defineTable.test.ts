@@ -22,4 +22,16 @@ describe('defineTable row actions', () => {
 
     expect(table.actions).toBe(actions)
   })
+
+  it('preserves the frozen column count in the spreadable table definition', () => {
+    const table = defineTable<Person>({
+      rowKey: 'id',
+      frozenColumns: 1,
+      columns: {
+        name: { label: 'Name', type: 'text' },
+      },
+    })
+
+    expect(table.frozenColumns).toBe(1)
+  })
 })

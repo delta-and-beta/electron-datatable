@@ -4,15 +4,27 @@ import type { ColumnDef } from '../types'
 interface UseColumnsOptions<T extends object> {
   columns: ColumnDef<T>[]
   storageKey?: string
+  frozenColumns?: number
 }
 
 interface ColumnState {
   visible: string[]
   order: string[]
   widths: Record<string, number>
+  frozen: number
 }
 
-export function useColumns<T extends object>({ columns, storageKey }: UseColumnsOptions<T>) {
+function normalizeFrozen(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : Math.max(0, Math.floor(fallback))
+}
+
+export function useColumns<T extends object>({
+  columns,
+  storageKey,
+  frozenColumns = 0,
+}: UseColumnsOptions<T>) {
   const fullKey = storageKey ? `${storageKey}-columns` : null
 
   const [state, setState] = useState<ColumnState>(() => {
@@ -31,6 +43,7 @@ export function useColumns<T extends object>({ columns, storageKey }: UseColumns
               visible: parsed.visible.filter((id: unknown) => typeof id === 'string' && validIds.has(id)),
               order: parsed.order.filter((id: unknown) => typeof id === 'string' && validIds.has(id)),
               widths: parsed.widths && typeof parsed.widths === 'object' ? parsed.widths : {},
+              frozen: normalizeFrozen(parsed.frozen, frozenColumns),
             }
           }
         }
@@ -43,6 +56,7 @@ export function useColumns<T extends object>({ columns, storageKey }: UseColumns
       visible: columns.filter((c) => c.visible !== false).map((c) => c.id),
       order: columns.map((c) => c.id),
       widths: {},
+      frozen: normalizeFrozen(frozenColumns),
     }
   })
 
@@ -80,13 +94,19 @@ export function useColumns<T extends object>({ columns, storageKey }: UseColumns
     setState((prev) => ({ ...prev, widths: { ...prev.widths, [id]: width } }))
   }, [])
 
+  const setFrozenColumns = useCallback((count: number) => {
+    setState((prev) => ({ ...prev, frozen: normalizeFrozen(count) }))
+  }, [])
+
   return {
     visibleColumns,
     allColumns: state.order,
     widths: state.widths,
+    frozenColumns: state.frozen,
     setColumnVisibility,
     reorderColumns,
     setColumnWidth,
+    setFrozenColumns,
     isVisible,
   }
 }
