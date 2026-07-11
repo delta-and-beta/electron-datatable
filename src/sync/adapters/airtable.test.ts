@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SyncEngine } from '../engine'
+import { inferColumns } from '../infer-columns'
 import { AirtableSyncAdapter } from './airtable'
 import type { AirtableClient } from './airtable'
 
@@ -189,7 +190,7 @@ describe('AirtableSyncAdapter', () => {
       ['phoneNumber', 'string'],
       ['singleSelect', 'string'],
       ['number', 'number'],
-      ['currency', 'number'],
+      ['currency', 'currency'],
       ['percent', 'number'],
       ['rating', 'number'],
       ['duration', 'number'],
@@ -212,7 +213,11 @@ describe('AirtableSyncAdapter', () => {
     const request = vi.fn().mockResolvedValue({ tables: [{
       id: 'tblCompanies',
       name: 'Companies',
-      fields: fields.map(([type], index) => ({ name: `Field ${index}`, type })),
+      fields: fields.map(([type], index) => ({
+        name: `Field ${index}`,
+        type,
+        ...(type === 'currency' ? { options: { symbol: '$', precision: 2 } } : {}),
+      })),
     }] })
     const adapter = new AirtableSyncAdapter({
       client: createMockClient({ request }),
@@ -226,8 +231,50 @@ describe('AirtableSyncAdapter', () => {
     expect(request).toHaveBeenCalledWith('meta/bases/appBase/tables')
     expect(schema.columns).toEqual([
       { name: 'airtable_id', sourceType: 'string' },
-      ...fields.map(([, sourceType], index) => ({ name: `Field ${index}`, sourceType })),
+      ...fields.map(([, sourceType], index) => ({
+        name: `Field ${index}`,
+        sourceType,
+        ...(sourceType === 'currency'
+          ? { metadata: { symbol: '$', precision: 2 } }
+          : {}),
+      })),
     ])
+  })
+
+  it('carries Airtable currency metadata through inferred column formatting', async () => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [
+        { name: 'Budget', type: 'currency', options: { symbol: 'HK$', precision: 3 } },
+        { name: 'Margin', type: 'percent', options: { precision: 1 } },
+      ],
+    }] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+
+    const schema = await adapter.describeSchema()
+
+    expect(schema.columns).toContainEqual({
+      name: 'Budget',
+      sourceType: 'currency',
+      metadata: { symbol: 'HK$', precision: 3 },
+    })
+    expect(inferColumns(schema)).toContainEqual(expect.objectContaining({
+      id: 'Budget',
+      type: 'currency',
+      symbol: 'HK$',
+      decimalPlaces: 3,
+      minorUnits: false,
+    }))
+    expect(inferColumns(schema)).toContainEqual(expect.objectContaining({
+      id: 'Margin',
+      type: 'number',
+    }))
   })
 
   it('finds metadata tables by name and rejects a missing configured table', async () => {

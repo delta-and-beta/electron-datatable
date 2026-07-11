@@ -2,11 +2,16 @@ export interface SourceColumn {
   name: string
   sourceType: string
   nullable?: boolean
+  metadata?: {
+    symbol?: string
+    precision?: number
+  }
 }
 
 export type SourceColumnType =
   | 'string'
   | 'number'
+  | 'currency'
   | 'date'
   | 'boolean'
   | 'tags'

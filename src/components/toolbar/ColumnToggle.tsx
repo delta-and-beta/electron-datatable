@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Columns3, Check, GripVertical } from 'lucide-react'
+import { Columns3, Check, GripVertical, Pin } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useDataTable } from '../../context'
 import { Popover } from '../Popover'
@@ -76,7 +76,7 @@ export function ColumnToggle({ className }: ColumnToggleProps) {
           </button>
         )}
         aria-label="Toggle column visibility"
-        contentClassName="w-[240px]"
+        contentClassName="w-[280px]"
       >
             {/* Header */}
             <div className="px-3 py-2 border-b border-gray-700">
@@ -98,7 +98,7 @@ export function ColumnToggle({ className }: ColumnToggleProps) {
                     onDragOver={(e) => handleDragOver(e, id)}
                     onDragEnd={handleDragEnd}
                     className={cn(
-                      'flex items-center gap-2 px-3 py-1.5 hover:bg-gray-700/50 transition-colors',
+                      'group flex items-center gap-2 px-3 py-1.5 hover:bg-gray-700/50 transition-colors',
                       draggedId === id && 'opacity-50',
                       dropTargetId === id && draggedId !== null && draggedId !== id && 'border-t border-blue-500/50',
                     )}
@@ -132,6 +132,27 @@ export function ColumnToggle({ className }: ColumnToggleProps) {
                       <span className="text-xs text-gray-200 truncate">{getColumnLabel(id)}</span>
                     </button>
 
+                    {visible && (
+                      <button
+                        type="button"
+                        aria-label={`Freeze up to here: ${getColumnLabel(id)}`}
+                        title="Freeze up to here"
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onClick={() => {
+                          const visibleIndex = columnState.visibleColumns.indexOf(id)
+                          if (visibleIndex >= 0) columnState.setFrozenColumns(visibleIndex + 1)
+                        }}
+                        className={cn(
+                          'p-0.5 text-gray-500 hover:text-blue-300 transition-opacity',
+                          columnState.visibleColumns.indexOf(id) < columnState.frozenColumns
+                            ? 'text-blue-400 opacity-100'
+                            : 'opacity-0 group-hover:opacity-100 focus:opacity-100',
+                        )}
+                      >
+                        <Pin className="w-3 h-3" />
+                      </button>
+                    )}
+
                     {/* Move up/down buttons */}
                     <button type="button" onClick={() => handleMoveUp(id)} disabled={isFirst}
                       aria-label={`Move ${getColumnLabel(id)} up`}
@@ -147,6 +168,17 @@ export function ColumnToggle({ className }: ColumnToggleProps) {
                 )
               })}
             </div>
+            {columnState.frozenColumns > 0 && (
+              <div className="border-t border-gray-700 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => columnState.setFrozenColumns(0)}
+                  className="text-xs text-gray-400 hover:text-gray-200"
+                >
+                  Unfreeze all
+                </button>
+              </div>
+            )}
       </Popover>
     </div>
   )

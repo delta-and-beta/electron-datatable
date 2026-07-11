@@ -28,6 +28,10 @@ interface AirtablePushResponse {
 interface AirtableField {
   name: string
   type: string
+  options?: {
+    symbol?: string
+    precision?: number
+  }
 }
 
 interface AirtableTable {
@@ -51,7 +55,6 @@ const stringTypes = new Set([
 ])
 const numberTypes = new Set([
   'number',
-  'currency',
   'percent',
   'rating',
   'duration',
@@ -62,6 +65,7 @@ const tagsTypes = new Set(['multipleSelects', 'multipleRecordLinks', 'multipleLo
 
 function sourceType(type: string): SourceColumnType {
   if (stringTypes.has(type)) return 'string'
+  if (type === 'currency') return 'currency'
   if (numberTypes.has(type)) return 'number'
   if (dateTypes.has(type)) return 'date'
   if (type === 'checkbox') return 'boolean'
@@ -130,10 +134,21 @@ export class AirtableSyncAdapter implements SyncAdapter {
     return {
       columns: [
         { name: 'airtable_id', sourceType: 'string' },
-        ...table.fields.map((field) => ({
-          name: field.name,
-          sourceType: sourceType(field.type),
-        })),
+        ...table.fields.map((field) => {
+          const type = sourceType(field.type)
+          return {
+            name: field.name,
+            sourceType: type,
+            ...(type === 'currency'
+              ? {
+                  metadata: {
+                    symbol: field.options?.symbol,
+                    precision: field.options?.precision,
+                  },
+                }
+              : {}),
+          }
+        }),
       ],
     }
   }

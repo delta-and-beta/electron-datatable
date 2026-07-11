@@ -24,6 +24,10 @@ function pixelWidth(width: string | number | undefined, measured?: number): numb
   return 0
 }
 
+function cssWidth(width: string | number): string {
+  return typeof width === 'number' ? `${width}px` : width
+}
+
 /* ---------------------------------------------------------------------------
  * Props
  * --------------------------------------------------------------------------- */
@@ -139,6 +143,25 @@ export function Content<T extends object = RowData>({
       columnState.widths[column.id] ?? column.width,
     ]),
   ) as Record<string, string | number | undefined>
+  const selectionWidth = 44
+  const hasAttachments = attachmentAdapter !== null
+  const hasResolvedWidth = visibleColumns.some((column) => resolvedWidths[column.id] !== undefined)
+  const unresolvedColumnCount = visibleColumns.filter(
+    (column) => resolvedWidths[column.id] === undefined,
+  ).length
+  const reservedWidths = [
+    ...(selection.enabled ? [`${selectionWidth}px`] : []),
+    ...(hasAttachments ? ['50px'] : []),
+    ...visibleColumns.flatMap((column) => {
+      const width = resolvedWidths[column.id]
+      return width === undefined ? [] : [cssWidth(width)]
+    }),
+  ]
+  const equalShareWidth = unresolvedColumnCount > 0
+    ? reservedWidths.length > 0
+      ? `calc((100% - ${reservedWidths.join(' - ')}) / ${unresolvedColumnCount})`
+      : `${100 / unresolvedColumnCount}%`
+    : undefined
 
   const configurableVisibleColumns = visibleColumns.filter(
     (column) => column.id !== ACTIONS_COLUMN_ID,
@@ -151,7 +174,6 @@ export function Content<T extends object = RowData>({
     configurableVisibleColumns.slice(0, frozenCount).map((column) => column.id),
   )
   const frozenOffsets: Record<string, number> = {}
-  const selectionWidth = 44
   const selectionFrozen = selection.enabled && frozenCount > 0
   let frozenOffset = selectionFrozen ? selectionWidth : 0
   for (const column of configurableVisibleColumns.slice(0, frozenCount)) {
@@ -160,7 +182,6 @@ export function Content<T extends object = RowData>({
   }
   const lastFrozenId = configurableVisibleColumns[frozenCount - 1]?.id
 
-  const hasAttachments = attachmentAdapter !== null
   const extraColSpan = (hasAttachments ? 1 : 0) + (selection.enabled ? 1 : 0)
   const colSpan = Math.max(visibleColumns.length, 1) + extraColSpan
   const isGrouped = groupBy.isGrouped
@@ -463,7 +484,19 @@ export function Content<T extends object = RowData>({
    * ----------------------------------------------------------------------- */
 
   return (
-    <Table className={className}>
+    <Table className={className} style={{ tableLayout: hasResolvedWidth ? 'fixed' : 'auto' }}>
+      {hasResolvedWidth && (
+        <colgroup>
+          {selection.enabled && <col style={{ width: selectionWidth }} />}
+          {hasAttachments && <col style={{ width: 50 }} />}
+          {visibleColumns.map((column) => (
+            <col
+              key={column.id}
+              style={{ width: resolvedWidths[column.id] ?? equalShareWidth }}
+            />
+          ))}
+        </colgroup>
+      )}
       <TableHeader className={cn(stickyHeader && 'sticky top-0 z-20 bg-dt-bg')}>
         <TableRow>
           {selection.enabled && (
