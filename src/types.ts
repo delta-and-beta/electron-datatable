@@ -114,6 +114,7 @@ export interface KanbanConfig<T extends object = RowData> {
   }
   allowMove?: boolean
   onMove?: (rowKey: string, toLane: string) => void | Promise<void>
+  onMoveError?: (error: unknown, rowKey: string, toLane: string) => void
 }
 
 /** Filter operators for text columns */

@@ -135,4 +135,25 @@ describe('useColumns', () => {
     expect(result.current.getSnapshot).toBe(originalGetSnapshot)
     expect(result.current.restore).toBe(originalRestore)
   })
+
+  it('appends columns added after a snapshot and respects their default visibility', () => {
+    const initialColumns = columns.slice(0, 3)
+    const { result, rerender } = renderHook(
+      ({ definitions }) => useColumns({ columns: definitions, storageKey: 'new-columns' }),
+      { initialProps: { definitions: initialColumns } },
+    )
+    const snapshot = result.current.getSnapshot()
+
+    rerender({
+      definitions: [
+        ...initialColumns,
+        { id: 'status', label: 'Status', type: 'text' },
+        { id: 'internal', label: 'Internal', type: 'text', visible: false },
+      ],
+    })
+    act(() => result.current.restore(snapshot))
+
+    expect(result.current.allColumns).toEqual(['name', 'email', 'age', 'status', 'internal'])
+    expect(result.current.visibleColumns).toEqual(['name', 'email', 'age', 'status'])
+  })
 })

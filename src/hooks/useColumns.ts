@@ -112,10 +112,18 @@ export function useColumns<T extends object>({
   }), [])
 
   const restore = useCallback((snapshot: ColumnSnapshot) => {
-    const validIds = new Set(columnsRef.current.map((column) => column.id))
+    const currentColumns = columnsRef.current
+    const validIds = new Set(currentColumns.map((column) => column.id))
+    const restoredOrder = snapshot.order.filter((id) => validIds.has(id))
+    const restoredOrderSet = new Set(restoredOrder)
+    const addedColumns = currentColumns.filter((column) => !restoredOrderSet.has(column.id))
+    const restoredVisible = snapshot.visible.filter((id) => validIds.has(id))
     const next: ColumnSnapshot = {
-      visible: snapshot.visible.filter((id) => validIds.has(id)),
-      order: snapshot.order.filter((id) => validIds.has(id)),
+      visible: [
+        ...restoredVisible,
+        ...addedColumns.filter((column) => column.visible !== false).map((column) => column.id),
+      ],
+      order: [...restoredOrder, ...addedColumns.map((column) => column.id)],
       widths: { ...snapshot.widths },
       frozen: normalizeFrozen(snapshot.frozen),
     }

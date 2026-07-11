@@ -63,6 +63,16 @@ function UncontrolledPopover() {
   )
 }
 
+function MultiControlPopover() {
+  return (
+    <Popover trigger={<button>Open controls</button>} aria-label="Control menu">
+      <button>First control</button>
+      <input aria-label="Middle control" />
+      <button>Last control</button>
+    </Popover>
+  )
+}
+
 describe('Popover', () => {
   it('portals content to document.body and focuses its first control', () => {
     render(<UncontrolledPopover />)
@@ -103,6 +113,28 @@ describe('Popover', () => {
     rectSpy.mockRestore()
   })
 
+  it('caps oversized content to the viewport and scrolls it internally', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 200 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 120 })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.getAttribute('role') === 'dialog'
+          ? { ...panelRect, width: 520, height: 400 }
+          : triggerRect
+      })
+
+    render(<UncontrolledPopover />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+
+    expect(screen.getByRole('dialog')).toHaveStyle({
+      left: '8px',
+      top: '8px',
+      maxWidth: '184px',
+      maxHeight: '104px',
+      overflow: 'auto',
+    })
+  })
+
   it('re-measures on scroll, resize, and content resize', () => {
     let currentTriggerRect = { ...triggerRect, top: 100, bottom: 132, left: 100, right: 180 }
     let currentPanelRect = { ...panelRect, height: 100 }
@@ -138,6 +170,30 @@ describe('Popover', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()
+  })
+
+  it('wraps Tab from the last focusable control to the first', () => {
+    render(<MultiControlPopover />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open controls' }))
+    const first = screen.getByRole('button', { name: 'First control' })
+    const last = screen.getByRole('button', { name: 'Last control' })
+    last.focus()
+
+    fireEvent.keyDown(document, { key: 'Tab' })
+
+    expect(first).toHaveFocus()
+  })
+
+  it('wraps Shift-Tab from the first focusable control to the last', () => {
+    render(<MultiControlPopover />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open controls' }))
+    const first = screen.getByRole('button', { name: 'First control' })
+    const last = screen.getByRole('button', { name: 'Last control' })
+    first.focus()
+
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+
+    expect(last).toHaveFocus()
   })
 
   it('closes on an outside mousedown but ignores the trigger and panel', () => {

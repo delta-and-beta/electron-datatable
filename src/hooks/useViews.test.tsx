@@ -20,14 +20,17 @@ function useFacet<T>(initial: T) {
 
 const emptyFilter = { root: createEmptyGroup(), enabled: true }
 
-function useViewsHarness(storageKey = 'views-test') {
+function useViewsHarness(
+  storageKey = 'views-test',
+  initialSort: DataTableView['sort'] = [],
+) {
   const columns = useFacet<DataTableView['columns']>({
     visible: ['name', 'amount'],
     order: ['name', 'amount'],
     widths: {},
     frozen: 0,
   })
-  const sort = useFacet<DataTableView['sort']>([])
+  const sort = useFacet<DataTableView['sort']>(initialSort)
   const filter = useFacet<DataTableView['filter']>(emptyFilter)
   const groupBy = useFacet<DataTableView['groupBy']>({ groups: [], collapsed: [], showEmpty: false })
   const viewMode = useFacet<'table' | 'kanban'>('table')
@@ -208,6 +211,129 @@ describe('useViews', () => {
       expect(result.current.groupBy.value).toEqual(defaultView.groupBy)
       expect(result.current.viewMode.value).toBe('kanban')
       expect(result.current.views.rowHeight).toBe('short')
+    })
+  })
+
+  it('persists the active saved view and reloads every saved facet without dirtiness', async () => {
+    const first = renderHook(() => useViewsHarness('saved-reload'))
+    const savedFilter = {
+      root: {
+        ...emptyFilter.root,
+        conditions: [{
+          id: 'saved-condition',
+          field: 'name',
+          operator: 'contains' as const,
+          value: 'saved',
+        }],
+      },
+      enabled: false,
+    }
+    let savedId = ''
+
+    act(() => {
+      first.result.current.columns.setValue({
+        visible: ['amount'],
+        order: ['amount', 'name'],
+        widths: { amount: 210 },
+        frozen: 1,
+      })
+      first.result.current.sort.setValue([{ field: 'amount', direction: 'desc' }])
+      first.result.current.filter.setValue(savedFilter)
+      first.result.current.groupBy.setValue({
+        groups: [{ field: 'name', sort: 'asc' }],
+        collapsed: ['Alice'],
+        showEmpty: true,
+      })
+      first.result.current.viewMode.setValue('kanban')
+      first.result.current.views.setRowHeight('tall')
+    })
+    act(() => {
+      savedId = first.result.current.views.saveAs('Saved').id
+    })
+
+    expect(localStorage.getItem('saved-reload-active-view')).toBe(savedId)
+    first.unmount()
+
+    const second = renderHook(() => useViewsHarness('saved-reload'))
+    await waitFor(() => {
+      expect(second.result.current.views.activeViewId).toBe(savedId)
+      expect(second.result.current.columns.value).toEqual({
+        visible: ['amount'],
+        order: ['amount', 'name'],
+        widths: { amount: 210 },
+        frozen: 1,
+      })
+      expect(second.result.current.sort.value).toEqual([{ field: 'amount', direction: 'desc' }])
+      expect(second.result.current.filter.value).toEqual(savedFilter)
+      expect(second.result.current.groupBy.value).toEqual({
+        groups: [{ field: 'name', sort: 'asc' }],
+        collapsed: ['Alice'],
+        showEmpty: true,
+      })
+      expect(second.result.current.viewMode.value).toBe('kanban')
+      expect(second.result.current.views.rowHeight).toBe('tall')
+      expect(second.result.current.views.isDirty).toBe(false)
+    })
+  })
+
+  it('reloads unsaved working facets over the active view and marks it dirty', async () => {
+    const first = renderHook(() => useViewsHarness('dirty-reload'))
+    let savedId = ''
+    act(() => {
+      first.result.current.viewMode.setValue('kanban')
+      first.result.current.views.setRowHeight('short')
+    })
+    act(() => {
+      savedId = first.result.current.views.saveAs('Baseline').id
+    })
+    act(() => {
+      first.result.current.sort.setValue([{ field: 'name', direction: 'desc' }])
+    })
+    localStorage.setItem('dirty-reload-sort', JSON.stringify([{ field: 'name', direction: 'desc' }]))
+    first.unmount()
+
+    const second = renderHook(() => useViewsHarness(
+      'dirty-reload',
+      [{ field: 'name', direction: 'desc' }],
+    ))
+    await waitFor(() => {
+      expect(second.result.current.views.activeViewId).toBe(savedId)
+      expect(second.result.current.sort.value).toEqual([{ field: 'name', direction: 'desc' }])
+      expect(second.result.current.viewMode.value).toBe('kanban')
+      expect(second.result.current.views.rowHeight).toBe('short')
+      expect(second.result.current.views.isDirty).toBe(true)
+    })
+  })
+
+  it('persists the active view on every switch', () => {
+    const { result } = renderHook(() => useViewsHarness('switch-active'))
+    let firstId = ''
+    let secondId = ''
+    act(() => {
+      firstId = result.current.views.saveAs('First').id
+      secondId = result.current.views.saveAs('Second').id
+    })
+
+    act(() => result.current.views.switchTo(firstId))
+
+    expect(result.current.views.activeViewId).toBe(firstId)
+    expect(localStorage.getItem('switch-active-active-view')).toBe(firstId)
+    expect(secondId).not.toBe(firstId)
+  })
+
+  it.each([
+    ['null', null],
+    ['array', []],
+  ])('migrates a malformed legacy group-by %s payload without throwing', (_label, payload) => {
+    localStorage.setItem('malformed-groupby', JSON.stringify(payload))
+
+    const { result } = renderHook(() => useViewsHarness('malformed'))
+
+    expect(result.current.views.views).toHaveLength(1)
+    expect(result.current.views.views[0].groupBy).toEqual({
+      groups: [],
+      collapsed: [],
+      showEmpty: false,
     })
   })
 })

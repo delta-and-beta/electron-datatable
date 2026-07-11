@@ -160,6 +160,143 @@ describe('KanbanBoard', () => {
     })
   })
 
+  it('reconciles an acknowledged optimistic lane with later authoritative data', async () => {
+    const onMove = vi.fn(() => Promise.resolve())
+    const board = renderBoard({ kanban: createKanban({ allowMove: true, onMove }) })
+    const transfer = dataTransfer()
+
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Alpha' }), { dataTransfer: transfer })
+    fireEvent.drop(screen.getByRole('region', { name: 'Closed won lane' }), {
+      dataTransfer: transfer,
+    })
+
+    await waitFor(() => expect(onMove).toHaveBeenCalledWith('1', 'Won'))
+    board.rerender(
+      <DataTable
+        data={deals.map((deal) => deal.id === '1' ? { ...deal, stage: 'New' } : deal)}
+        columns={columns}
+        rowKey="id"
+        storageKey="kanban-board-test"
+        defaultGroupBy={[{ field: 'stage', sort: 'asc' }]}
+        kanban={createKanban({ allowMove: true, onMove })}
+      >
+        <KanbanBoard<Deal> />
+      </DataTable>,
+    )
+
+    await waitFor(() => {
+      expect(within(screen.getByRole('region', { name: 'New lane' })).getByText('Alpha')).toBeInTheDocument()
+    })
+  })
+
+  it('drops an optimistic lane after authoritative data reaches the move target', async () => {
+    const onMove = vi.fn(() => new Promise<void>(() => {}))
+    const board = renderBoard({ kanban: createKanban({ allowMove: true, onMove }) })
+    const transfer = dataTransfer()
+
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Alpha' }), { dataTransfer: transfer })
+    fireEvent.drop(screen.getByRole('region', { name: 'Closed won lane' }), {
+      dataTransfer: transfer,
+    })
+    board.rerender(
+      <DataTable
+        data={deals.map((deal) => deal.id === '1' ? { ...deal, stage: 'Won' } : deal)}
+        columns={columns}
+        rowKey="id"
+        storageKey="kanban-board-test"
+        defaultGroupBy={[{ field: 'stage', sort: 'asc' }]}
+        kanban={createKanban({ allowMove: true, onMove })}
+      >
+        <KanbanBoard<Deal> />
+      </DataTable>,
+    )
+
+    await waitFor(() => {
+      expect(within(screen.getByRole('region', { name: 'Closed won lane' })).getByText('Alpha')).toBeInTheDocument()
+    })
+
+    board.rerender(
+      <DataTable
+        data={deals.map((deal) => deal.id === '1' ? { ...deal, stage: 'New' } : deal)}
+        columns={columns}
+        rowKey="id"
+        storageKey="kanban-board-test"
+        defaultGroupBy={[{ field: 'stage', sort: 'asc' }]}
+        kanban={createKanban({ allowMove: true, onMove })}
+      >
+        <KanbanBoard<Deal> />
+      </DataTable>,
+    )
+
+    await waitFor(() => {
+      expect(within(screen.getByRole('region', { name: 'New lane' })).getByText('Alpha')).toBeInTheDocument()
+    })
+  })
+
+  it('does not accept drops in the synthetic Uncategorized lane', () => {
+    const onMove = vi.fn()
+    renderBoard({ kanban: createKanban({ allowMove: true, onMove }) })
+    const transfer = dataTransfer()
+
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Alpha' }), { dataTransfer: transfer })
+    const uncategorized = screen.getByRole('region', { name: 'Uncategorized lane' })
+    fireEvent.dragOver(uncategorized)
+    fireEvent.drop(uncategorized, { dataTransfer: transfer })
+
+    expect(onMove).not.toHaveBeenCalled()
+    expect(uncategorized).not.toHaveClass('bg-dt-bg-secondary')
+  })
+
+  it('keeps a real Uncategorized lane separate from the synthetic fallback lane', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      renderBoard({
+        data: [
+          { ...deals[0], stage: 'Uncategorized' },
+          deals[1],
+        ],
+        kanban: createKanban({ laneOrder: ['New', 'Won', 'Uncategorized'] }),
+      })
+
+      const uncategorizedLanes = screen.getAllByRole('region', { name: 'Uncategorized lane' })
+      expect(uncategorizedLanes).toHaveLength(2)
+      expect(uncategorizedLanes.some((lane) => within(lane).queryByText('Alpha'))).toBe(true)
+      expect(uncategorizedLanes.some((lane) => within(lane).queryByText('Beta'))).toBe(true)
+      expect(uncategorizedLanes.some((lane) => (
+        within(lane).queryByText('Alpha') && within(lane).queryByText('Beta')
+      ))).toBe(false)
+      expect(consoleError).not.toHaveBeenCalled()
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it.each([
+    ['rejection', (error: Error) => Promise.reject(error)],
+    ['synchronous throw', (error: Error) => { throw error }],
+  ])('reports a %s after rolling back the move', async (_case, move) => {
+    const error = new Error('move failed')
+    const onMoveError = vi.fn()
+    renderBoard({
+      kanban: createKanban({
+        allowMove: true,
+        onMove: () => move(error),
+        onMoveError,
+      }),
+    })
+    const transfer = dataTransfer()
+
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Alpha' }), { dataTransfer: transfer })
+    fireEvent.drop(screen.getByRole('region', { name: 'Closed won lane' }), {
+      dataTransfer: transfer,
+    })
+
+    await waitFor(() => {
+      expect(within(screen.getByRole('region', { name: 'New lane' })).getByText('Alpha')).toBeInTheDocument()
+      expect(onMoveError).toHaveBeenCalledWith(error, '1', 'Won')
+    })
+  })
+
   it('renders non-draggable cards when movement is disabled', () => {
     renderBoard({ kanban: createKanban({ allowMove: false, onMove: vi.fn() }) })
 
