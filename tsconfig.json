@@ -21,7 +21,7 @@
       "@/*": ["./src/*"]
     }
   },
-  "files": ["src/types.compat.test.tsx"],
+  "files": ["src/types.compat.test.tsx", "src/sync.types.compat.test.ts"],
   "include": ["src"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
 }

@@ -24,4 +24,11 @@ export default defineConfig([
     external: ['react', 'react-dom', 'tailwindcss'],
     treeshake: true,
   },
+  {
+    entry: ['src/sync.ts'],
+    format: ['esm', 'cjs'],
+    dts: true,
+    external: ['react', 'react-dom', 'tailwindcss'],
+    treeshake: true,
+  },
 ])

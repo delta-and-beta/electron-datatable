@@ -22,6 +22,11 @@
       "import": "./dist/matching.js",
       "require": "./dist/matching.cjs"
     },
+    "./sync": {
+      "types": "./dist/sync.d.ts",
+      "import": "./dist/sync.js",
+      "require": "./dist/sync.cjs"
+    },
     "./styles.css": "./dist/styles.css",
     "./themes/dark.css": "./dist/themes/dark.css",
     "./themes/light.css": "./dist/themes/light.css"
