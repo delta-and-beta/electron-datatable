@@ -60,7 +60,14 @@ describe('ColumnToggle', () => {
 
     fireEvent.click(columnsBtn)
     expect(columnsBtn).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('dialog', { name: /column/i })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /column/i }).parentNode).toBe(document.body)
+  })
+
+  it('applies column visibility changes', () => {
+    render(<DataTable columns={columns} data={data} rowKey="id" preset="full" />)
+    fireEvent.click(screen.getByText('Columns'))
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Name visibility' }))
+    expect(screen.queryByRole('columnheader', { name: 'Name' })).not.toBeInTheDocument()
   })
 
   it('closes panel on Escape', () => {
@@ -83,7 +90,7 @@ describe('FilterToolbarButton', () => {
   it('opens filter panel on click', () => {
     render(<DataTable columns={columns} data={data} rowKey="id" preset="full" />)
     fireEvent.click(screen.getByText('Filter'))
-    expect(screen.getByRole('dialog', { name: /filter/i })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /filter/i }).parentNode).toBe(document.body)
   })
 
   it('closes filter panel on Escape', () => {
@@ -153,6 +160,19 @@ describe('GroupByToolbarButton', () => {
     expect(groupBtn).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('opens, applies a group, and closes', () => {
+    render(<DataTable columns={columns} data={data} rowKey="id" preset="full" />)
+    fireEvent.click(screen.getByText('Group'))
+    const dialog = screen.getByRole('dialog', { name: /group/i })
+    expect(dialog.parentNode).toBe(document.body)
+
+    fireEvent.click(screen.getByText('Add group'))
+    expect(screen.getByRole('button', { name: /Grouped by 1 field/ })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: /group/i })).not.toBeInTheDocument()
+  })
+
   it('excludes tags columns from groupable candidates', () => {
     const tagColumns: ColumnDef[] = [
       { id: 'tags', label: 'Tags', type: 'tags' },
@@ -173,5 +193,20 @@ describe('GroupByToolbarButton', () => {
 
     expect(screen.getByRole('option', { name: 'Name' })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: 'Tags' })).not.toBeInTheDocument()
+  })
+})
+
+describe('SortControl', () => {
+  it('opens, applies a sort, and closes', () => {
+    render(<DataTable columns={columns} data={data} rowKey="id" preset="full" />)
+    fireEvent.click(screen.getByText('Sort'))
+    const dialog = screen.getByRole('dialog', { name: /sort/i })
+    expect(dialog.parentNode).toBe(document.body)
+
+    fireEvent.click(screen.getByText('Add sort'))
+    expect(screen.getByRole('button', { name: /Sorted by 1 field/ })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: /sort/i })).not.toBeInTheDocument()
   })
 })

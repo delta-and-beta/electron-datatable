@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { GripVertical, Trash2, Plus } from 'lucide-react'
 import { cn } from '../../lib/utils'
-import { useDropdownAlign } from '../../hooks/useDropdownAlign'
 import type { ColumnDef } from '../../types'
 import type { SortLevel } from '../../lib/sort'
 
@@ -22,24 +21,9 @@ const SORT_LABELS: Record<string, { asc: string; desc: string }> = {
 
 const MAX_LEVELS = 3
 
-export function SortConfigPanel({ levels, columns, onChange, onClose }: SortConfigPanelProps) {
-  const { ref: panelRef, alignRight } = useDropdownAlign()
+export function SortConfigPanel({ levels, columns, onChange }: SortConfigPanelProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (panelRef.current) {
-      const first = panelRef.current.querySelector<HTMLElement>('button, select, [tabindex]')
-      first?.focus()
-    }
-  }, [panelRef])
-
-  function handlePanelKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.stopPropagation()
-      onClose()
-    }
-  }
 
   const sortableColumns = columns.filter((c) => c.sortable !== false)
   const usedFields = new Set(levels.map((l) => l.field))
@@ -84,29 +68,15 @@ export function SortConfigPanel({ levels, columns, onChange, onClose }: SortConf
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-label="Sort configuration"
-        onKeyDown={handlePanelKeyDown}
-        className={cn(
-          'absolute top-full z-50 mt-1 w-[460px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl',
-          alignRight ? 'right-0' : 'left-0',
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+        <span className="text-sm font-medium text-gray-200">Sort by</span>
+        {levels.length > 0 && (
+          <button onClick={() => onChange([])} className="text-xs text-gray-400 hover:text-gray-200 transition-colors">
+            Clear all
+          </button>
         )}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-          <span className="text-sm font-medium text-gray-200">Sort by</span>
-          {levels.length > 0 && (
-            <button onClick={() => onChange([])} className="text-xs text-gray-400 hover:text-gray-200 transition-colors">
-              Clear all
-            </button>
-          )}
-        </div>
+      </div>
 
         {/* Content */}
         <div className="p-3 space-y-2">
@@ -199,7 +169,6 @@ export function SortConfigPanel({ levels, columns, onChange, onClose }: SortConf
             </button>
           )}
         </div>
-      </div>
     </>
   )
 }

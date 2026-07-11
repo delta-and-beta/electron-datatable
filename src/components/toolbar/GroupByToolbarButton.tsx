@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils'
 interface GroupByToolbarButtonProps {
   activeCount: number
   isOpen: boolean
-  onClick: () => void
+  onClick?: () => void
   className?: string
 }
 

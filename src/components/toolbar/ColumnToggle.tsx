@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { Columns3, Check, GripVertical } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useDataTable } from '../../context'
+import { Popover } from '../Popover'
 
 interface ColumnToggleProps {
   className?: string
@@ -12,27 +13,6 @@ export function ColumnToggle({ className }: ColumnToggleProps) {
   const [open, setOpen] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (open && panelRef.current) {
-      const first = panelRef.current.querySelector<HTMLElement>('button, [tabindex]')
-      first?.focus()
-    }
-  }, [open])
-
-  function close() {
-    setOpen(false)
-    triggerRef.current?.focus()
-  }
-
-  function handlePanelKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.stopPropagation()
-      close()
-    }
-  }
 
   function handleMoveUp(id: string) {
     const index = columnState.allColumns.indexOf(id)
@@ -77,29 +57,27 @@ export function ColumnToggle({ className }: ColumnToggleProps) {
   }
 
   return (
-    <div className={cn('relative', className)}>
-      <button
-        ref={triggerRef}
-        onClick={() => setOpen(!open)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        className={cn(
-          'inline-flex items-center gap-2 h-8 px-3 text-xs font-medium rounded-md border transition-colors',
-          'border-gray-600 text-gray-300 hover:bg-gray-700',
-          open && 'bg-gray-700',
+    <div className={className}>
+      <Popover
+        open={open}
+        onOpenChange={setOpen}
+        trigger={(
+          <button
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            className={cn(
+              'inline-flex items-center gap-2 h-8 px-3 text-xs font-medium rounded-md border transition-colors',
+              'border-gray-600 text-gray-300 hover:bg-gray-700',
+              open && 'bg-gray-700',
+            )}
+          >
+            <Columns3 className="w-4 h-4" />
+            Columns
+          </button>
         )}
+        aria-label="Toggle column visibility"
+        contentClassName="w-[240px]"
       >
-        <Columns3 className="w-4 h-4" />
-        Columns
-      </button>
-
-      {open && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-40" onClick={close} />
-
-          {/* Dropdown */}
-          <div ref={panelRef} role="dialog" aria-label="Toggle column visibility" onKeyDown={handlePanelKeyDown} className="absolute top-full right-0 z-50 mt-1 w-[240px] rounded-lg border border-gray-700 bg-gray-800 shadow-xl">
             {/* Header */}
             <div className="px-3 py-2 border-b border-gray-700">
               <span className="text-xs text-gray-400">Drag to reorder columns</span>
@@ -169,9 +147,7 @@ export function ColumnToggle({ className }: ColumnToggleProps) {
                 )
               })}
             </div>
-          </div>
-        </>
-      )}
+      </Popover>
     </div>
   )
 }
