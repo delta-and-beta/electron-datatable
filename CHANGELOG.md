@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-07-11
+
+### Added
+
+- **Batch selection & bulk actions.** `bulkActions: BulkAction<T>[]` enables a
+  frozen-aware checkbox column, select-all-visible (indeterminate on partial),
+  shift-click range selection, and a floating action bar operating on the
+  typed selected rows. Selection clears on filter/search/view-mode changes.
+
 ## [0.6.0] - 2026-07-11
 
 ### Added
