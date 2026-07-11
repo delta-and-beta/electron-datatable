@@ -15,6 +15,95 @@ afterEach(() => {
 })
 
 describe('AirtableSyncAdapter', () => {
+  it('reports push support only when the client can send a request body', () => {
+    const readOnly = new AirtableSyncAdapter({
+      client: createMockClient(),
+      baseId: 'appBase',
+      table: 'Companies',
+    })
+    const writable = new AirtableSyncAdapter({
+      client: createMockClient({ requestWithBody: vi.fn() }),
+      baseId: 'appBase',
+      table: 'Companies',
+    })
+
+    expect(readOnly.capabilities.canPush).toBe(false)
+    expect(writable.capabilities.canPush).toBe(true)
+    expect(writable.pushBatchSize).toBe(10)
+  })
+
+  it('pins the PATCH body shape, typecast flag, and defensive airtable_id stripping', async () => {
+    const requestWithBody = vi.fn().mockResolvedValue({ records: [
+      { id: 'rec1', fields: { Name: 'Updated' } },
+    ] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ requestWithBody }),
+      baseId: 'appBase',
+      table: 'Companies',
+      interPageDelayMs: 0,
+    })
+
+    await expect(adapter.push([{ externalId: 'rec1', fields: {
+      airtable_id: 'must-not-leak',
+      Name: 'Updated',
+    } }])).resolves.toEqual([{ externalId: 'rec1', ok: true }])
+    expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/Companies', {
+      records: [{ id: 'rec1', fields: { Name: 'Updated' } }],
+      typecast: true,
+    })
+  })
+
+  it('retries a rejected batch as individual records to isolate a 422 offender', async () => {
+    const requestWithBody = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('invalid request'), { status: 422 }))
+      .mockResolvedValueOnce({ records: [{ id: 'recGood', fields: { Name: 'Good' } }] })
+      .mockRejectedValueOnce(Object.assign(new Error('unprocessable entity'), {
+        status: 422,
+        response: { error: { message: 'Name cannot be blank' } },
+      }))
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ requestWithBody }),
+      baseId: 'appBase',
+      table: 'Companies',
+      interPageDelayMs: 0,
+    })
+
+    const results = await adapter.push([
+      { externalId: 'recGood', fields: { Name: 'Good' } },
+      { externalId: 'recBad', fields: { Name: '' } },
+    ])
+
+    expect(results).toEqual([
+      { externalId: 'recGood', ok: true },
+      { externalId: 'recBad', ok: false, error: 'Name cannot be blank' },
+    ])
+    expect(requestWithBody).toHaveBeenCalledTimes(3)
+    expect(requestWithBody.mock.calls[1][2].records).toHaveLength(1)
+    expect(requestWithBody.mock.calls[2][2].records).toHaveLength(1)
+  })
+
+  it('honors the rate-limit cooldown when pushing', async () => {
+    vi.useFakeTimers()
+    const requestWithBody = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('rate limited'), { status: 429 }))
+      .mockResolvedValueOnce({ records: [{ id: 'rec1', fields: {} }] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ requestWithBody }),
+      baseId: 'appBase',
+      table: 'Companies',
+      interPageDelayMs: 0,
+      rateLimitDelayMs: 500,
+    })
+
+    const pushPromise = adapter.push([{ externalId: 'rec1', fields: { Name: 'One' } }])
+    await vi.advanceTimersByTimeAsync(499)
+    expect(requestWithBody).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(1)
+
+    await expect(pushPromise).resolves.toEqual([{ externalId: 'rec1', ok: true }])
+    expect(requestWithBody).toHaveBeenCalledTimes(2)
+  })
+
   it('resumes offset pagination across three pages and preserves terminal cursor semantics', async () => {
     const request = vi.fn()
       .mockResolvedValueOnce({ records: [{ id: 'rec1', fields: { Name: 'One' } }], offset: 'page-2' })
@@ -309,7 +398,7 @@ describe('AirtableSyncAdapter', () => {
     })
 
     expect(adapter.id).toBe('airtable:appBase/Companies')
-    expect(adapter.capabilities).toEqual({ snapshotConsistent: false })
+    expect(adapter.capabilities).toEqual({ snapshotConsistent: false, canPush: false })
     expect(() => new SyncEngine(adapter, { upsert: vi.fn() }, {
       externalIdField: 'airtable_id',
       deletionPolicy: 'delete',

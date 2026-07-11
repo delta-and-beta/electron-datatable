@@ -10,6 +10,8 @@ export type {
   SyncPhase,
   SyncProgress,
   SyncProgressCallback,
+  SyncPushChange,
+  SyncPushRecordResult,
   SyncRunResult,
   SyncTarget,
 } from './sync/types'

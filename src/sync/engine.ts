@@ -4,6 +4,8 @@ import type {
   SyncCursor,
   SyncEngineOptions,
   SyncProgressCallback,
+  SyncPushChange,
+  SyncPushRecordResult,
   SyncRunResult,
   SyncTarget,
 } from './types'
@@ -62,6 +64,25 @@ export class SyncEngine {
 
   commit(): Promise<SyncRunResult> {
     return this.run(true)
+  }
+
+  async push(changes: SyncPushChange[]): Promise<SyncPushRecordResult[]> {
+    if (this.adapter.capabilities?.canPush !== true || this.adapter.push === undefined) {
+      throw new TypeError(`Sync adapter "${this.adapter.id}" is not configured for push`)
+    }
+
+    const batchSize = Math.max(1, Math.floor(this.adapter.pushBatchSize ?? 10))
+    const results: SyncPushRecordResult[] = []
+    for (let index = 0; index < changes.length; index += batchSize) {
+      const batch = changes.slice(index, index + batchSize)
+      try {
+        results.push(...await this.adapter.push(batch))
+      } catch (error) {
+        const message = errorMessage(error)
+        results.push(...batch.map(({ externalId }) => ({ externalId, ok: false, error: message })))
+      }
+    }
+    return results
   }
 
   private progress(phase: Parameters<SyncProgressCallback>[0]['phase'], current: number, message?: string): void {

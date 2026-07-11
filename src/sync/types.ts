@@ -29,13 +29,27 @@ export interface SyncPage {
   done: boolean
 }
 
+export interface SyncPushChange {
+  externalId: string
+  fields: Record<string, unknown>
+}
+
+export interface SyncPushRecordResult {
+  externalId: string
+  ok: boolean
+  error?: string
+}
+
 export interface SyncAdapter {
   readonly id: string
   readonly capabilities?: {
     snapshotConsistent?: boolean
+    canPush?: boolean
   }
+  readonly pushBatchSize?: number
   describeSchema(): Promise<SourceSchema>
   pull(cursor?: SyncCursor): Promise<SyncPage>
+  push?(changes: SyncPushChange[]): Promise<SyncPushRecordResult[]>
   close?(): Promise<void>
 }
 

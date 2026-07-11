@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPollingHandle, SyncEngine } from './engine'
-import type { SyncAdapter, SyncPage, SyncTarget } from './types'
+import type { SyncAdapter, SyncPage, SyncPushChange, SyncTarget } from './types'
 
 function createMockAdapter(overrides?: Partial<SyncAdapter>): SyncAdapter {
   return {
@@ -26,6 +26,83 @@ beforeEach(() => {
 })
 
 describe('SyncEngine', () => {
+  it('throws a clear adapter configuration error when push is unsupported', async () => {
+    const adapter = createMockAdapter({ capabilities: { snapshotConsistent: true, canPush: false } })
+
+    await expect(new SyncEngine(adapter, createMockTarget(), {
+      externalIdField: 'id',
+    }).push([{ externalId: 'one', fields: { Name: 'One' } }])).rejects.toThrow(
+      'Sync adapter "mock" is not configured for push',
+    )
+  })
+
+  it('chunks push changes by the default batch limit and aggregates results in order', async () => {
+    const push = vi.fn(async (changes: SyncPushChange[]) => changes.map(({ externalId }) => ({
+      externalId,
+      ok: true,
+    })))
+    const adapter = createMockAdapter({
+      capabilities: { snapshotConsistent: true, canPush: true },
+      push,
+    })
+    const changes = Array.from({ length: 23 }, (_, index) => ({
+      externalId: `rec${index + 1}`,
+      fields: { Name: `Record ${index + 1}` },
+    }))
+
+    const results = await new SyncEngine(adapter, createMockTarget(), {
+      externalIdField: 'id',
+    }).push(changes)
+
+    expect(push.mock.calls.map(([batch]) => batch)).toEqual([
+      changes.slice(0, 10),
+      changes.slice(10, 20),
+      changes.slice(20),
+    ])
+    expect(results).toHaveLength(23)
+    expect(results.map(({ externalId }) => externalId)).toEqual(changes.map(({ externalId }) => externalId))
+  })
+
+  it('marks only a failed push batch and continues remaining batches without target transactions', async () => {
+    const push = vi.fn()
+      .mockResolvedValueOnce([
+        { externalId: 'one', ok: true },
+        { externalId: 'two', ok: true },
+      ])
+      .mockRejectedValueOnce(new Error('remote unavailable'))
+      .mockResolvedValueOnce([{ externalId: 'five', ok: true }])
+    const target = createMockTarget({
+      begin: vi.fn(),
+      commitTx: vi.fn(),
+      rollback: vi.fn(),
+    })
+    const adapter = createMockAdapter({
+      capabilities: { snapshotConsistent: true, canPush: true },
+      pushBatchSize: 2,
+      push,
+    })
+
+    const results = await new SyncEngine(adapter, target, { externalIdField: 'id' }).push([
+      { externalId: 'one', fields: {} },
+      { externalId: 'two', fields: {} },
+      { externalId: 'three', fields: {} },
+      { externalId: 'four', fields: {} },
+      { externalId: 'five', fields: {} },
+    ])
+
+    expect(results).toEqual([
+      { externalId: 'one', ok: true },
+      { externalId: 'two', ok: true },
+      { externalId: 'three', ok: false, error: 'remote unavailable' },
+      { externalId: 'four', ok: false, error: 'remote unavailable' },
+      { externalId: 'five', ok: true },
+    ])
+    expect(push).toHaveBeenCalledTimes(3)
+    expect(target.begin).not.toHaveBeenCalled()
+    expect(target.commitTx).not.toHaveBeenCalled()
+    expect(target.rollback).not.toHaveBeenCalled()
+  })
+
   it('rejects destructive reconciliation for a non-snapshot source', () => {
     const adapter = createMockAdapter({ capabilities: { snapshotConsistent: false } })
 
