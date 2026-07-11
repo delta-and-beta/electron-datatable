@@ -2,6 +2,7 @@
 export type {
   RowData,
   RowAction,
+  BulkAction,
   ColumnDef,
   DatePeriod,
   GroupLevel,

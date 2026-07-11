@@ -47,7 +47,7 @@ export function Content<T extends object = RowData>({
   renderCell,
   onRowClick,
 }: ContentProps<T>) {
-  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey, attachmentAdapter, attachmentCounts, views } = useDataTable<T>()
+  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey, attachmentAdapter, attachmentCounts, views, selection } = useDataTable<T>()
   const rowHeightClass = {
     short: 'dt-row-height-short py-1.5',
     medium: 'dt-row-height-medium py-3',
@@ -106,7 +106,9 @@ export function Content<T extends object = RowData>({
     configurableVisibleColumns.slice(0, frozenCount).map((column) => column.id),
   )
   const frozenOffsets: Record<string, number> = {}
-  let frozenOffset = 0
+  const selectionWidth = 44
+  const selectionFrozen = selection.enabled && frozenCount > 0
+  let frozenOffset = selectionFrozen ? selectionWidth : 0
   for (const column of configurableVisibleColumns.slice(0, frozenCount)) {
     frozenOffsets[column.id] = frozenOffset
     frozenOffset += pixelWidth(resolvedWidths[column.id], measuredWidths[column.id])
@@ -114,7 +116,7 @@ export function Content<T extends object = RowData>({
   const lastFrozenId = configurableVisibleColumns[frozenCount - 1]?.id
 
   const hasAttachments = attachmentAdapter !== null
-  const extraColSpan = hasAttachments ? 1 : 0
+  const extraColSpan = (hasAttachments ? 1 : 0) + (selection.enabled ? 1 : 0)
   const colSpan = Math.max(visibleColumns.length, 1) + extraColSpan
   const isGrouped = groupBy.isGrouped
   const isEmpty = sortedData.length === 0
@@ -163,7 +165,35 @@ export function Content<T extends object = RowData>({
               }
             : undefined
         }
+        data-state={selection.selectedIds.has(key) ? 'selected' : undefined}
       >
+        {selection.enabled && (
+          <TableCell
+            className={cn(
+              'p-0 text-center',
+              selectionFrozen && 'dt-frozen-cell sticky z-10',
+            )}
+            style={{
+              width: selectionWidth,
+              minWidth: selectionWidth,
+              ...(selectionFrozen ? { position: 'sticky', left: 0 } : {}),
+            }}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              aria-label={`Select ${String(record.name ?? key)}`}
+              checked={selection.selectedIds.has(key)}
+              readOnly
+              onClick={(event) => {
+                event.stopPropagation()
+                selection.toggleRow(row, event.shiftKey)
+              }}
+              className="h-4 w-4 cursor-pointer accent-dt-primary"
+            />
+          </TableCell>
+        )}
         {hasAttachments && (
           <TableCell key="__attachments" className={cn('text-center', rowHeightClass)} style={{ width: '50px' }}>
             {(attachmentCounts[String(record[rowKey])] ?? 0) > 0 ? (
@@ -240,6 +270,8 @@ export function Content<T extends object = RowData>({
           onToggle={() => groupBy.toggleCollapse(path)}
           renderCell={renderAggregateCell}
           extraColSpan={extraColSpan}
+          selectionEnabled={selection.enabled}
+          selectionFrozen={selectionFrozen}
           resolvedWidths={resolvedWidths}
           frozenOffsets={frozenOffsets}
           lastFrozenId={lastFrozenId}
@@ -305,6 +337,38 @@ export function Content<T extends object = RowData>({
     <Table className={className}>
       <TableHeader className={cn(stickyHeader && 'sticky top-0 z-20 bg-dt-bg')}>
         <TableRow>
+          {selection.enabled && (
+            <TableHead
+              scope="col"
+              className={cn(
+                'p-0 text-center',
+                selectionFrozen && 'dt-frozen-header sticky z-30',
+              )}
+              style={{
+                width: selectionWidth,
+                minWidth: selectionWidth,
+                ...(selectionFrozen ? { position: 'sticky', left: 0 } : {}),
+              }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <input
+                ref={(element) => {
+                  if (element) {
+                    element.indeterminate = selection.someVisibleSelected && !selection.allVisibleSelected
+                  }
+                }}
+                type="checkbox"
+                aria-label="Select all visible rows"
+                checked={selection.allVisibleSelected}
+                readOnly
+                onClick={(event) => {
+                  event.stopPropagation()
+                  selection.toggleAllVisible()
+                }}
+                className="h-4 w-4 cursor-pointer accent-dt-primary"
+              />
+            </TableHead>
+          )}
           {hasAttachments && (
             <TableHead scope="col" className="text-center" style={{ width: '50px' }}>
               <Paperclip className="w-3.5 h-3.5 mx-auto text-dt-muted" />
@@ -400,6 +464,8 @@ export function Content<T extends object = RowData>({
                 isCollapsed={collapsed}
                 onToggle={() => groupBy.toggleCollapse(path)}
                 extraColSpan={extraColSpan}
+                selectionEnabled={selection.enabled}
+                selectionFrozen={selectionFrozen}
                 resolvedWidths={resolvedWidths}
                 frozenOffsets={frozenOffsets}
                 lastFrozenId={lastFrozenId}

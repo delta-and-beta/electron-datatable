@@ -1,4 +1,4 @@
-import type { ColumnDef, GroupLevel, KanbanConfig, RowAction } from './types'
+import type { BulkAction, ColumnDef, GroupLevel, KanbanConfig, RowAction } from './types'
 
 /** Column definition using object key as field ID */
 type ColumnConfig<T extends object> = Omit<ColumnDef<T>, 'id'>
@@ -10,6 +10,7 @@ interface TableConfig<T extends object> {
   frozenColumns?: number
   columns: { [K in keyof T]?: ColumnConfig<T> }
   actions?: RowAction<T>[]
+  bulkActions?: BulkAction<T>[]
   kanban?: KanbanConfig<T>
   viewMode?: 'table' | 'kanban'
   onViewModeChange?: (viewMode: 'table' | 'kanban') => void
@@ -23,6 +24,7 @@ interface TableConfig<T extends object> {
 interface TableDefinition<T extends object> {
   columns: ColumnDef<T>[]
   actions?: RowAction<T>[]
+  bulkActions?: BulkAction<T>[]
   kanban?: KanbanConfig<T>
   viewMode?: 'table' | 'kanban'
   onViewModeChange?: (viewMode: 'table' | 'kanban') => void
@@ -58,6 +60,7 @@ export function defineTable<T extends object>(config: TableConfig<T>): TableDefi
   return {
     columns,
     actions: config.actions,
+    bulkActions: config.bulkActions,
     kanban: config.kanban,
     viewMode: config.viewMode,
     onViewModeChange: config.onViewModeChange,

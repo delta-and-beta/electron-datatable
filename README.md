@@ -31,6 +31,7 @@
 | **Compound components** | Use presets for zero-config, or compose your own layout |
 | **Theming** | `dt-*` design tokens via CSS custom properties, dark & light included |
 | **Bulk file matching** | Drop files → OCR → match → confirm → attach, with adapter pattern |
+| **Batch actions** | Select visible rows, shift-select ranges, and run typed bulk actions |
 | **Type-safe** | Generic `defineTable<T>()` with full IntelliSense on column IDs |
 | **Tree-shakeable** | Every hook and pure function importable independently |
 
@@ -103,6 +104,34 @@ function App() {
 ```
 
 That's it. You get search, filtering, grouping, column toggle, and sorting out of the box.
+
+### Batch selection and actions
+
+Providing `bulkActions` enables a leading checkbox column in table mode. The
+header checkbox selects the current filtered/search result, and shift-clicking
+row checkboxes selects an inclusive range. Actions receive the selected domain
+rows as a typed array.
+
+```tsx
+const table = defineTable<Transaction>({
+  rowKey: 'id',
+  columns: {
+    merchant: { label: 'Merchant', type: 'text' },
+    amount: { label: 'Amount', type: 'currency', currency: 'USD' },
+  },
+  bulkActions: [
+    {
+      key: 'archive',
+      title: 'Archive',
+      onClick: async (rows) => archiveTransactions(rows.map((row) => row.id)),
+    },
+  ],
+})
+```
+
+Selection is intentionally transient: it clears after a bulk action resolves,
+when filter or search state changes, and when switching between table and
+kanban modes. Batch selection is table-mode only.
 
 ---
 

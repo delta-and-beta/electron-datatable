@@ -16,6 +16,16 @@ export type RowAction<T extends object> = {
   variant?: 'default' | 'danger'
 }
 
+/** An action rendered for the current table selection */
+export type BulkAction<T extends object> = {
+  key: string
+  title: string
+  icon?: ReactNode
+  onClick: (rows: T[]) => void | Promise<void>
+  variant?: 'default' | 'danger'
+  show?: (rows: T[]) => boolean
+}
+
 /** Date bucketing period for group-by */
 export type DatePeriod = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
@@ -187,6 +197,11 @@ export interface DataTableProps<T extends object = RowData> {
   data: T[]
   columns: ColumnDef<T>[]
   actions?: RowAction<T>[]
+  /**
+   * Enables table-only row selection and renders actions for selected rows.
+   * Selection clears when filter/search state or the table/kanban mode changes.
+   */
+  bulkActions?: BulkAction<T>[]
   rowKey: keyof T & string
   storageKey?: string
   /** Number of leading visible data columns kept fixed during horizontal scroll */

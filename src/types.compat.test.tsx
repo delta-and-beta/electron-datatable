@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { DataTable } from './components/DataTable'
 import { MatchingDataTable } from './components/matching/MatchingDataTable'
 import type { MatchingAdapter } from './matching-types'
-import type { ColumnDef } from './types'
+import type { BulkAction, ColumnDef } from './types'
 
 interface Person {
   id: string
@@ -19,6 +19,16 @@ const people: Person[] = [
 const columns: ColumnDef<Person>[] = [
   { id: 'name', label: 'Name', type: 'text' },
   { id: 'age', label: 'Age', type: 'number' },
+]
+
+const bulkActions: BulkAction<Person>[] = [
+  {
+    key: 'archive',
+    title: 'Archive people',
+    onClick: (selectedPeople) => {
+      selectedPeople.map((person) => person.id)
+    },
+  },
 ]
 
 const matchingAdapter: MatchingAdapter<Person> = {
@@ -41,6 +51,7 @@ describe('plain object row compatibility', () => {
         columns={columns}
         rowKey="id"
         preset="minimal"
+        bulkActions={bulkActions}
         onRowClick={(person) => person.name}
       />,
     )
