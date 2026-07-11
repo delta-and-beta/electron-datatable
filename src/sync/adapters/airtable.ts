@@ -1,4 +1,12 @@
-import type { SourceColumnType, SourceSchema, SyncAdapter, SyncCursor, SyncPage } from '../types'
+import type {
+  SourceColumnType,
+  SourceSchema,
+  SyncAdapter,
+  SyncCursor,
+  SyncPage,
+  SyncPushChange,
+  SyncPushRecordResult,
+} from '../types'
 
 const RETRY_DELAY_MS = 1000
 const RATE_LIMIT_DELAY_MS = 30_000
@@ -13,9 +21,17 @@ interface AirtableListResponse {
   offset?: string
 }
 
+interface AirtablePushResponse {
+  records: AirtableRecord[]
+}
+
 interface AirtableField {
   name: string
   type: string
+  options?: {
+    symbol?: string
+    precision?: number
+  }
 }
 
 interface AirtableTable {
@@ -39,7 +55,6 @@ const stringTypes = new Set([
 ])
 const numberTypes = new Set([
   'number',
-  'currency',
   'percent',
   'rating',
   'duration',
@@ -50,6 +65,7 @@ const tagsTypes = new Set(['multipleSelects', 'multipleRecordLinks', 'multipleLo
 
 function sourceType(type: string): SourceColumnType {
   if (stringTypes.has(type)) return 'string'
+  if (type === 'currency') return 'currency'
   if (numberTypes.has(type)) return 'number'
   if (dateTypes.has(type)) return 'date'
   if (type === 'checkbox') return 'boolean'
@@ -66,8 +82,9 @@ export interface AirtableClient {
    * Consumers should throw errors with a numeric `status` field so the adapter
    * can distinguish rate limits, transient server failures, and client errors.
    * A numeric `retryAfterMs` field may also provide an explicit retry delay.
-   */
+  */
   request(path: string, params?: Record<string, string>): Promise<unknown>
+  requestWithBody?(method: string, path: string, body: unknown): Promise<unknown>
 }
 
 export interface AirtableSyncAdapterOptions {
@@ -85,7 +102,8 @@ export interface AirtableSyncAdapterOptions {
 
 export class AirtableSyncAdapter implements SyncAdapter {
   readonly id: string
-  readonly capabilities = { snapshotConsistent: false } as const
+  readonly capabilities: { snapshotConsistent: false; canPush: boolean }
+  readonly pushBatchSize = 10
   private readonly pageSize: number
   private readonly interPageDelayMs: number
   private readonly maxRetries: number
@@ -95,6 +113,10 @@ export class AirtableSyncAdapter implements SyncAdapter {
 
   constructor(private readonly options: AirtableSyncAdapterOptions) {
     this.id = `airtable:${options.baseId}/${options.table}`
+    this.capabilities = {
+      snapshotConsistent: false,
+      canPush: options.client.requestWithBody !== undefined,
+    }
     this.pageSize = Math.min(options.pageSize ?? 100, 100)
     this.interPageDelayMs = options.interPageDelayMs ?? 210
     this.maxRetries = Math.max(options.maxRetries ?? 1, 0)
@@ -112,10 +134,21 @@ export class AirtableSyncAdapter implements SyncAdapter {
     return {
       columns: [
         { name: 'airtable_id', sourceType: 'string' },
-        ...table.fields.map((field) => ({
-          name: field.name,
-          sourceType: sourceType(field.type),
-        })),
+        ...table.fields.map((field) => {
+          const type = sourceType(field.type)
+          return {
+            name: field.name,
+            sourceType: type,
+            ...(type === 'currency'
+              ? {
+                  metadata: {
+                    symbol: field.options?.symbol,
+                    precision: field.options?.precision,
+                  },
+                }
+              : {}),
+          }
+        }),
       ],
     }
   }
@@ -143,15 +176,65 @@ export class AirtableSyncAdapter implements SyncAdapter {
     }
   }
 
+  async push(changes: SyncPushChange[]): Promise<SyncPushRecordResult[]> {
+    if (this.options.client.requestWithBody === undefined) {
+      throw new TypeError(`Airtable adapter "${this.id}" requires client.requestWithBody for push`)
+    }
+
+    const results: SyncPushRecordResult[] = []
+    for (let index = 0; index < changes.length; index += this.pushBatchSize) {
+      const batch = changes.slice(index, index + this.pushBatchSize)
+      results.push(...await this.pushBatch(batch))
+    }
+    return results
+  }
+
+  private async pushBatch(changes: SyncPushChange[]): Promise<SyncPushRecordResult[]> {
+    try {
+      const response = await this.requestWithBody('PATCH', `${this.options.baseId}/${this.options.table}`, {
+        records: changes.map(({ externalId, fields }) => {
+          const pushFields = { ...fields }
+          delete pushFields.airtable_id
+          return { id: externalId, fields: pushFields }
+        }),
+        typecast: true,
+      }) as AirtablePushResponse
+      const returnedIds = new Set(response.records.map(({ id }) => id))
+      return changes.map(({ externalId }) => returnedIds.has(externalId)
+        ? { externalId, ok: true }
+        : { externalId, ok: false, error: 'Airtable did not return the updated record' })
+    } catch (error) {
+      if (this.getErrorNumber(error, 'status') === 422 && changes.length > 1) {
+        const results: SyncPushRecordResult[] = []
+        for (const change of changes) results.push(...await this.pushBatch([change]))
+        return results
+      }
+      const message = this.getErrorMessage(error)
+      return changes.map(({ externalId }) => ({ externalId, ok: false, error: message }))
+    }
+  }
+
   private async request(path: string, params?: Record<string, string>): Promise<unknown> {
+    return this.requestWithRetry(() => params === undefined
+      ? this.options.client.request(path)
+      : this.options.client.request(path, params))
+  }
+
+  private async requestWithBody(method: string, path: string, body: unknown): Promise<unknown> {
+    const requestWithBody = this.options.client.requestWithBody
+    if (requestWithBody === undefined) {
+      throw new TypeError(`Airtable adapter "${this.id}" requires client.requestWithBody for push`)
+    }
+    return this.requestWithRetry(() => requestWithBody.call(this.options.client, method, path, body))
+  }
+
+  private async requestWithRetry(operation: () => Promise<unknown>): Promise<unknown> {
     let retries = 0
     while (true) {
       await this.waitForRequestWindow()
       this.lastRequestAt = Date.now()
       try {
-        return params === undefined
-          ? await this.options.client.request(path)
-          : await this.options.client.request(path, params)
+        return await operation()
       } catch (error) {
         if (retries >= this.maxRetries) throw error
         const retryDelayMs = this.getRetryDelay(error)
@@ -175,6 +258,21 @@ export class AirtableSyncAdapter implements SyncAdapter {
     if (typeof error !== 'object' || error === null) return undefined
     const value = (error as Record<string, unknown>)[field]
     return typeof value === 'number' ? value : undefined
+  }
+
+  private getErrorMessage(error: unknown): string {
+    if (typeof error === 'object' && error !== null) {
+      const errorRecord = error as Record<string, unknown>
+      for (const container of [errorRecord, errorRecord.response, errorRecord.body]) {
+        if (typeof container === 'object' && container !== null) {
+          const responseError = (container as Record<string, unknown>).error
+          if (typeof responseError !== 'object' || responseError === null) continue
+          const message = (responseError as Record<string, unknown>).message
+          if (typeof message === 'string') return message
+        }
+      }
+    }
+    return error instanceof Error ? error.message : String(error)
   }
 
   private async waitForRequestWindow(): Promise<void> {

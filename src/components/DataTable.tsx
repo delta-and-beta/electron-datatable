@@ -50,6 +50,8 @@ function DataTableRoot<T extends object = RowData>({
   onViewModeChange,
   onRowClick,
   onRowContextMenu,
+  onCellEdit,
+  onCellEditError,
   toolbarExtra,
   footerKpis,
   className,
@@ -237,6 +239,8 @@ function DataTableRoot<T extends object = RowData>({
       storageKey,
       kanban,
       onRowClick,
+      onCellEdit,
+      onCellEditError,
     }),
     [
       data,
@@ -258,6 +262,8 @@ function DataTableRoot<T extends object = RowData>({
       storageKey,
       kanban,
       onRowClick,
+      onCellEdit,
+      onCellEditError,
     ],
   )
 
@@ -272,6 +278,10 @@ function DataTableRoot<T extends object = RowData>({
     devWarn(
       !!defaultSort?.field && !tableColumns.some((c) => c.id === defaultSort.field),
       `defaultSort field "${defaultSort?.field}" not found in columns`,
+    )
+    devWarn(
+      columns.some((column) => column.editable && column.render !== undefined),
+      'editable is ignored for custom-rendered columns',
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

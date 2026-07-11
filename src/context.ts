@@ -52,6 +52,8 @@ export interface DataTableContextValue<T extends object = RowData> {
   storageKey: string
   kanban?: KanbanConfig<T>
   onRowClick?: (row: T) => void
+  onCellEdit?: (row: T, columnId: string, nextValue: unknown) => void | Promise<void>
+  onCellEditError?: (error: unknown, row: T, columnId: string) => void
 }
 
 const DataTableContext = createContext<DataTableContextValue | null>(null)

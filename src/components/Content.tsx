@@ -1,4 +1,4 @@
-import { Fragment, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowUp, ArrowDown, ArrowUpDown, Paperclip } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useDataTable } from '../context'
@@ -8,6 +8,7 @@ import type { RowData, ColumnDef, GroupedSection } from '../types'
 import { asRecord } from '../lib/as-record'
 import { ACTIONS_COLUMN_ID } from '../actions'
 import { renderColumnValue } from './render-column-value'
+import { InlineCellEditor } from './InlineCellEditor'
 
 /** Resolve effective text alignment — currency/number default to right */
 function getAlign<T extends object>(col: ColumnDef<T>): 'left' | 'center' | 'right' {
@@ -21,6 +22,10 @@ function pixelWidth(width: string | number | undefined, measured?: number): numb
     return Number.parseFloat(width)
   }
   return 0
+}
+
+function cssWidth(width: string | number): string {
+  return typeof width === 'number' ? `${width}px` : width
 }
 
 /* ---------------------------------------------------------------------------
@@ -48,7 +53,22 @@ export function Content<T extends object = RowData>({
   renderCell,
   onRowClick,
 }: ContentProps<T>) {
-  const { sortedData, groupedData, columns, columnState, groupBy, sort, rowKey, attachmentAdapter, attachmentCounts, views, selection } = useDataTable<T>()
+  const {
+    data,
+    sortedData,
+    groupedData,
+    columns,
+    columnState,
+    groupBy,
+    sort,
+    rowKey,
+    attachmentAdapter,
+    attachmentCounts,
+    views,
+    selection,
+    onCellEdit,
+    onCellEditError,
+  } = useDataTable<T>()
   const rowHeightClass = {
     short: 'dt-row-height-short py-1.5',
     medium: 'dt-row-height-medium py-3',
@@ -66,6 +86,26 @@ export function Content<T extends object = RowData>({
   const visibleColumnSignature = visibleColumns.map((column) => (
     `${column.id}:${String(columnState.widths[column.id] ?? column.width ?? '')}`
   )).join('\u0000')
+
+  type EditingCell = {
+    key: string
+    row: T
+    column: ColumnDef<T>
+    value: unknown
+  }
+  type OptimisticCell = { value: unknown; revision: number }
+
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null)
+  const [optimisticCells, setOptimisticCells] = useState<Record<string, OptimisticCell>>({})
+  const previousDataRef = useRef(data)
+  const revisionRef = useRef(0)
+
+  useEffect(() => {
+    if (previousDataRef.current === data) return
+    previousDataRef.current = data
+    setEditingCell(null)
+    setOptimisticCells({})
+  }, [data])
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -103,6 +143,25 @@ export function Content<T extends object = RowData>({
       columnState.widths[column.id] ?? column.width,
     ]),
   ) as Record<string, string | number | undefined>
+  const selectionWidth = 44
+  const hasAttachments = attachmentAdapter !== null
+  const hasResolvedWidth = visibleColumns.some((column) => resolvedWidths[column.id] !== undefined)
+  const unresolvedColumnCount = visibleColumns.filter(
+    (column) => resolvedWidths[column.id] === undefined,
+  ).length
+  const reservedWidths = [
+    ...(selection.enabled ? [`${selectionWidth}px`] : []),
+    ...(hasAttachments ? ['50px'] : []),
+    ...visibleColumns.flatMap((column) => {
+      const width = resolvedWidths[column.id]
+      return width === undefined ? [] : [cssWidth(width)]
+    }),
+  ]
+  const equalShareWidth = unresolvedColumnCount > 0
+    ? reservedWidths.length > 0
+      ? `calc((100% - ${reservedWidths.join(' - ')}) / ${unresolvedColumnCount})`
+      : `${100 / unresolvedColumnCount}%`
+    : undefined
 
   const configurableVisibleColumns = visibleColumns.filter(
     (column) => column.id !== ACTIONS_COLUMN_ID,
@@ -115,7 +174,6 @@ export function Content<T extends object = RowData>({
     configurableVisibleColumns.slice(0, frozenCount).map((column) => column.id),
   )
   const frozenOffsets: Record<string, number> = {}
-  const selectionWidth = 44
   const selectionFrozen = selection.enabled && frozenCount > 0
   let frozenOffset = selectionFrozen ? selectionWidth : 0
   for (const column of configurableVisibleColumns.slice(0, frozenCount)) {
@@ -124,7 +182,6 @@ export function Content<T extends object = RowData>({
   }
   const lastFrozenId = configurableVisibleColumns[frozenCount - 1]?.id
 
-  const hasAttachments = attachmentAdapter !== null
   const extraColSpan = (hasAttachments ? 1 : 0) + (selection.enabled ? 1 : 0)
   const colSpan = Math.max(visibleColumns.length, 1) + extraColSpan
   const isGrouped = groupBy.isGrouped
@@ -141,6 +198,57 @@ export function Content<T extends object = RowData>({
   const renderAggregateCell = renderCell
     ? (col: ColumnDef<T>, value: unknown) => renderCell(col, value, {} as T)
     : (col: ColumnDef<T>, value: unknown) => renderColumnValue(col, value)
+
+  const getCellKey = (rowId: string, columnId: string) => JSON.stringify([rowId, columnId])
+  const canEditColumn = (column: ColumnDef<T>) => (
+    onCellEdit !== undefined
+    && column.editable === true
+    && column.render === undefined
+    && renderCell === undefined
+  )
+
+  const beginEditing = (row: T, rowId: string, column: ColumnDef<T>, value: unknown) => {
+    setEditingCell({ key: getCellKey(rowId, column.id), row, column, value })
+  }
+
+  const commitEdit = (
+    cell: EditingCell,
+    nextValue: unknown,
+    nextColumn?: ColumnDef<T>,
+  ) => {
+    const revision = ++revisionRef.current
+    setOptimisticCells((current) => ({
+      ...current,
+      [cell.key]: { value: nextValue, revision },
+    }))
+    setEditingCell(nextColumn
+      ? {
+          key: getCellKey(String(asRecord(cell.row)[rowKey]), nextColumn.id),
+          row: cell.row,
+          column: nextColumn,
+          value: asRecord(cell.row)[nextColumn.id],
+        }
+      : null)
+
+    try {
+      Promise.resolve(onCellEdit?.(cell.row, cell.column.id, nextValue)).catch((error: unknown) => {
+        setOptimisticCells((current) => {
+          if (current[cell.key]?.revision !== revision) return current
+          const next = { ...current }
+          delete next[cell.key]
+          return next
+        })
+        onCellEditError?.(error, cell.row, cell.column.id)
+      })
+    } catch (error) {
+      setOptimisticCells((current) => {
+        const next = { ...current }
+        delete next[cell.key]
+        return next
+      })
+      onCellEditError?.(error, cell.row, cell.column.id)
+    }
+  }
 
   /* -----------------------------------------------------------------------
    * Render a single data row
@@ -216,7 +324,11 @@ export function Content<T extends object = RowData>({
           </TableCell>
         )}
         {visibleColumns.map((col) => {
-          const value = record[col.id]
+          const cellKey = getCellKey(key, col.id)
+          const optimisticCell = optimisticCells[cellKey]
+          const value = optimisticCell ? optimisticCell.value : record[col.id]
+          const isEditable = canEditColumn(col)
+          const isEditing = editingCell?.key === cellKey
           const align = getAlign(col)
           const isFirstCol = col.id === visibleColumns[0]?.id
           const isFrozen = frozenIds.has(col.id)
@@ -232,6 +344,8 @@ export function Content<T extends object = RowData>({
                 (col.type === 'currency' || col.type === 'number') && 'tabular-nums',
                 isFrozen && 'dt-frozen-cell sticky z-10',
                 isFrozenEdge && 'dt-frozen-edge',
+                isEditable && 'cursor-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-dt-primary',
+                isEditing && 'p-0',
               )}
               style={{
                 ...(resolvedWidths[col.id]
@@ -244,8 +358,35 @@ export function Content<T extends object = RowData>({
                   ? { paddingLeft: groupRowIndent }
                   : {}),
               }}
+              tabIndex={isEditable ? 0 : undefined}
+              data-editable={isEditable ? 'true' : undefined}
+              onClick={isEditable ? (event) => event.stopPropagation() : undefined}
+              onDoubleClick={isEditable ? (event) => {
+                event.stopPropagation()
+                beginEditing(row, key, col, value)
+              } : undefined}
+              onKeyDown={isEditable ? (event) => {
+                event.stopPropagation()
+                if (event.key === 'Enter' && !isEditing) {
+                  event.preventDefault()
+                  beginEditing(row, key, col, value)
+                }
+              } : undefined}
             >
-              {renderCell
+              {isEditing && editingCell ? (
+                <InlineCellEditor
+                  column={col}
+                  value={editingCell.value}
+                  onCancel={() => setEditingCell(null)}
+                  onCommit={(nextValue, moveNext) => {
+                    const currentIndex = visibleColumns.findIndex((column) => column.id === col.id)
+                    const nextColumn = moveNext
+                      ? visibleColumns.slice(currentIndex + 1).find(canEditColumn)
+                      : undefined
+                    commitEdit(editingCell, nextValue, nextColumn)
+                  }}
+                />
+              ) : renderCell
                 ? renderCell(col, value, row)
                 : renderColumnValue(col, value, row, true)}
             </TableCell>
@@ -343,7 +484,19 @@ export function Content<T extends object = RowData>({
    * ----------------------------------------------------------------------- */
 
   return (
-    <Table className={className}>
+    <Table className={className} style={{ tableLayout: hasResolvedWidth ? 'fixed' : 'auto' }}>
+      {hasResolvedWidth && (
+        <colgroup>
+          {selection.enabled && <col style={{ width: selectionWidth }} />}
+          {hasAttachments && <col style={{ width: 50 }} />}
+          {visibleColumns.map((column) => (
+            <col
+              key={column.id}
+              style={{ width: resolvedWidths[column.id] ?? equalShareWidth }}
+            />
+          ))}
+        </colgroup>
+      )}
       <TableHeader className={cn(stickyHeader && 'sticky top-0 z-20 bg-dt-bg')}>
         <TableRow>
           {selection.enabled && (

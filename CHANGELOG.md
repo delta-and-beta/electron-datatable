@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-07-12
+
+### Added
+
+- **Inline cell editing.** Editable table columns support keyboard and pointer
+  entry, type-appropriate editors, optimistic commits, cancellation, and
+  rollback with error callbacks.
+- **Adapter push.** The sync contract exposes push capabilities and per-record
+  results; `SyncEngine.push()` validates adapter support, and
+  `AirtableSyncAdapter` writes typecast PATCH batches with existing retry and
+  rate-limit behavior.
+- **Freeze controls.** The Columns panel can freeze through any visible column
+  in the current order or unfreeze all columns, using the existing persisted
+  column-state and named-view payload.
+
+### Fixed
+
+- Airtable currency fields now retain Meta API symbol and precision metadata,
+  allowing `inferColumns()` to format major-unit values as currency without
+  guessing from ordinary numeric sources.
+- Resizing a column on a wide, previously width-less table now engages fixed
+  layout with a complete colgroup, so the dragged edge follows the requested
+  width while frozen offsets continue to use painted geometry.
+
 ## [0.9.0] - 2026-07-11
 
 ### Added

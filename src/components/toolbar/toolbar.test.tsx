@@ -77,6 +77,68 @@ describe('ColumnToggle', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  it('freezes through a visible column, persists the count, and follows reorder', () => {
+    const freezeColumns: ColumnDef[] = [
+      { id: 'name', label: 'Name', type: 'text', width: 120 },
+      { id: 'amount', label: 'Amount', type: 'number', width: 80 },
+      { id: 'status', label: 'Status', type: 'text', width: 100 },
+    ]
+    const props = {
+      columns: freezeColumns,
+      data: [{ id: '1', name: 'Alice', amount: 100, status: 'Open' }],
+      rowKey: 'id',
+      storageKey: 'freeze-panel',
+      preset: 'full' as const,
+    }
+    const first = render(<DataTable {...props} />)
+
+    fireEvent.click(screen.getByText('Columns'))
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Amount visibility' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Freeze up to here: Status' }))
+
+    expect(JSON.parse(localStorage.getItem('freeze-panel-columns')!).frozen).toBe(2)
+    expect(screen.getByRole('columnheader', { name: /Name/ })).toHaveClass('dt-frozen-header')
+    expect(screen.getByRole('columnheader', { name: /Status/ })).toHaveClass('dt-frozen-header')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move Status up' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Move Status up' }))
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      expect.stringContaining('Status'),
+      expect.stringContaining('Name'),
+    ])
+    expect(JSON.parse(localStorage.getItem('freeze-panel-columns')!).frozen).toBe(2)
+
+    first.unmount()
+    render(<DataTable {...props} />)
+
+    expect(screen.getByRole('columnheader', { name: /Status/ })).toHaveClass('dt-frozen-header')
+    expect(screen.getByRole('columnheader', { name: /Name/ })).toHaveClass('dt-frozen-header')
+  })
+
+  it('unfreezes all columns and persists the reset', () => {
+    localStorage.setItem('unfreeze-panel-columns', JSON.stringify({
+      visible: ['name', 'amount'],
+      order: ['name', 'amount'],
+      widths: {},
+      frozen: 2,
+    }))
+    render(
+      <DataTable
+        columns={columns}
+        data={data}
+        rowKey="id"
+        storageKey="unfreeze-panel"
+        preset="full"
+      />,
+    )
+
+    fireEvent.click(screen.getByText('Columns'))
+    fireEvent.click(screen.getByRole('button', { name: 'Unfreeze all' }))
+
+    expect(screen.getByRole('columnheader', { name: /Name/ })).not.toHaveClass('dt-frozen-header')
+    expect(JSON.parse(localStorage.getItem('unfreeze-panel-columns')!).frozen).toBe(0)
+  })
 })
 
 describe('FilterToolbarButton', () => {

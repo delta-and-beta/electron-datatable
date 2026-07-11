@@ -1,5 +1,14 @@
 import { AirtableSyncAdapter, SQLiteSyncAdapter } from './sync'
-import type { AirtableClient, AirtableSyncAdapterOptions, SQLiteClient, SourceColumnType, SyncTarget } from './sync'
+import type {
+  AirtableClient,
+  AirtableSyncAdapterOptions,
+  SQLiteClient,
+  SourceColumnType,
+  SyncAdapter,
+  SyncPushChange,
+  SyncPushRecordResult,
+  SyncTarget,
+} from './sync'
 import { describe, expect, it } from 'vitest'
 
 const synchronousTarget = {
@@ -45,6 +54,19 @@ const airtableOptions = {
   rateLimitDelayMs: 30_000,
 } satisfies AirtableSyncAdapterOptions
 new AirtableSyncAdapter(airtableOptions)
+
+const pushChanges: SyncPushChange[] = [{ externalId: 'rec1', fields: { Name: 'Updated' } }]
+const pushResults: SyncPushRecordResult[] = [{ externalId: 'rec1', ok: true }]
+const pushAdapter = {
+  id: 'push-adapter',
+  capabilities: { canPush: true },
+  pushBatchSize: 10,
+  async describeSchema() { return { columns: [] } },
+  async pull() { return { rows: [], cursor: null, done: true } },
+  async push(_changes: SyncPushChange[]) { return pushResults },
+} satisfies SyncAdapter
+void pushChanges
+void pushAdapter
 
 describe('SyncTarget type compatibility', () => {
   it('accepts synchronous and asynchronous write implementations', () => {

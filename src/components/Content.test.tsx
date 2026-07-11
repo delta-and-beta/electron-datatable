@@ -65,6 +65,59 @@ describe('Content', () => {
     expect(screen.getByText('Alice').closest('td')).toHaveStyle({ width: '200px' })
   })
 
+  it('switches a width-less table to fixed layout on its first resize', () => {
+    const { container } = render(
+      <DataTable
+        columns={columns}
+        data={data}
+        rowKey="id"
+        storageKey="first-resize-fixed-layout"
+        preset="minimal"
+      />,
+    )
+
+    const table = container.querySelector('table')!
+    const nameHeader = screen.getByText('Name').closest('th')!
+    nameHeader.getBoundingClientRect = () => ({ width: 120 } as DOMRect)
+
+    expect(table).toHaveStyle({ tableLayout: 'auto' })
+    expect(table.querySelector('colgroup')).not.toBeInTheDocument()
+
+    fireEvent.mouseDown(within(nameHeader).getByTitle('Drag to resize'), { clientX: 100 })
+    fireEvent.mouseMove(document, { clientX: 180 })
+    fireEvent.mouseUp(document)
+
+    expect(table).toHaveStyle({ tableLayout: 'fixed' })
+    expect(nameHeader).toHaveStyle({ width: '200px' })
+    expect(table.querySelector('colgroup')).toBeInTheDocument()
+  })
+
+  it('renders a complete colgroup with resolved and equal-share widths', () => {
+    const fixedColumns: ColumnDef[] = [
+      { id: 'name', label: 'Name', type: 'text', width: 120 },
+      { id: 'amount', label: 'Amount', type: 'number' },
+      { id: 'status', label: 'Status', type: 'text' },
+    ]
+    const { container } = render(
+      <DataTable
+        columns={fixedColumns}
+        data={[{ id: '1', name: 'Alice', amount: 100, status: 'Open' }]}
+        rowKey="id"
+        storageKey="complete-colgroup"
+        preset="minimal"
+      />,
+    )
+
+    const table = container.querySelector('table')!
+    const colWidths = Array.from(table.querySelectorAll('col')).map((col) => col.style.width)
+
+    expect(table).toHaveStyle({ tableLayout: 'fixed' })
+    expect(colWidths).toHaveLength(3)
+    expect(colWidths[0]).toBe('120px')
+    expect(colWidths[1]).not.toBe('')
+    expect(colWidths[1]).toBe(colWidths[2])
+  })
+
   it('measures auto-width columns for offsets without locking their rendered widths', () => {
     const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
       .mockReturnValue({ width: 120 } as DOMRect)

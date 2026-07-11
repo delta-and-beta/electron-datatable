@@ -9,6 +9,7 @@ const customTypes = /^(?:json|jsonb|struct)\b/i
 const adapterTypeMap = {
   string: 'text',
   number: 'number',
+  currency: 'currency',
   date: 'date',
   boolean: 'text',
   tags: 'tags',
@@ -44,6 +45,12 @@ export function inferColumns(
 
     if (booleanTypes.test(column.sourceType.trim())) {
       inferred.options = ['true', 'false']
+    }
+
+    if (column.sourceType.trim() === 'currency') {
+      inferred.symbol = column.metadata?.symbol
+      inferred.decimalPlaces = column.metadata?.precision ?? 2
+      inferred.minorUnits = false
     }
 
     return { ...inferred, ...overrides[column.name] }
