@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Airtable sync adapter.** `AirtableSyncAdapter` provides dependency-free
   offset paging, schema discovery, Airtable record flattening, request pacing,
-  and configurable retry behavior through a consumer-supplied structural
-  client. Live-base scans are marked non-snapshot-consistent so destructive
-  deletion remains guarded by `SyncEngine`.
+  and status-aware retry behavior through a consumer-supplied structural
+  client. Rate limits honor explicit retry delays or Airtable's 30-second
+  cooldown, transient failures retain configurable backoff, and other client
+  errors fail immediately. Live-base scans are marked non-snapshot-consistent
+  so destructive deletion remains guarded by `SyncEngine`.
 
 ## [0.8.0] - 2026-07-11
 

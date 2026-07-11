@@ -162,10 +162,87 @@ describe('AirtableSyncAdapter', () => {
     await expect(missing.describeSchema()).rejects.toThrow('Airtable table "Missing" was not found')
   })
 
-  it('retries one thrown client error after a one-second backoff', async () => {
+  it('waits the default 30-second cooldown before retrying a 429 response', async () => {
     vi.useFakeTimers()
     const request = vi.fn()
       .mockRejectedValueOnce(Object.assign(new Error('rate limited'), { status: 429 }))
+      .mockResolvedValueOnce({ records: [] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request }),
+      baseId: 'appBase',
+      table: 'Companies',
+      interPageDelayMs: 0,
+    })
+
+    const pagePromise = adapter.pull()
+    await vi.advanceTimersByTimeAsync(29_999)
+    expect(request).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(1)
+
+    await expect(pagePromise).resolves.toEqual({ rows: [], cursor: null, done: true })
+    expect(request).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry a non-rate-limit 4xx response', async () => {
+    const error = Object.assign(new Error('not found'), { status: 404 })
+    const request = vi.fn().mockRejectedValue(error)
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request }),
+      baseId: 'appBase',
+      table: 'Companies',
+      interPageDelayMs: 0,
+    })
+
+    await expect(adapter.pull()).rejects.toBe(error)
+    expect(request).toHaveBeenCalledOnce()
+  })
+
+  it('retries a 5xx response once after the default one-second delay', async () => {
+    vi.useFakeTimers()
+    const request = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('server error'), { status: 500 }))
+      .mockResolvedValueOnce({ records: [] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request }),
+      baseId: 'appBase',
+      table: 'Companies',
+      interPageDelayMs: 0,
+    })
+
+    const pagePromise = adapter.pull()
+    await vi.advanceTimersByTimeAsync(999)
+    expect(request).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(1)
+
+    await expect(pagePromise).resolves.toEqual({ rows: [], cursor: null, done: true })
+    expect(request).toHaveBeenCalledTimes(2)
+  })
+
+  it('honors retryAfterMs before the status-specific default delay', async () => {
+    vi.useFakeTimers()
+    const request = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('rate limited'), { status: 429, retryAfterMs: 2500 }))
+      .mockResolvedValueOnce({ records: [] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request }),
+      baseId: 'appBase',
+      table: 'Companies',
+      interPageDelayMs: 0,
+    })
+
+    const pagePromise = adapter.pull()
+    await vi.advanceTimersByTimeAsync(2499)
+    expect(request).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(1)
+
+    await expect(pagePromise).resolves.toEqual({ rows: [], cursor: null, done: true })
+    expect(request).toHaveBeenCalledTimes(2)
+  })
+
+  it('treats an error without a status as transient and retries after one second', async () => {
+    vi.useFakeTimers()
+    const request = vi.fn()
+      .mockRejectedValueOnce(new Error('network unavailable'))
       .mockResolvedValueOnce({ records: [] })
     const adapter = new AirtableSyncAdapter({
       client: createMockClient({ request }),
@@ -197,7 +274,7 @@ describe('AirtableSyncAdapter', () => {
 
     const pagePromise = adapter.pull()
     const rejection = expect(pagePromise).rejects.toBe(error)
-    await vi.advanceTimersByTimeAsync(1000)
+    await vi.advanceTimersByTimeAsync(30_000)
 
     await rejection
     expect(request).toHaveBeenCalledTimes(2)
