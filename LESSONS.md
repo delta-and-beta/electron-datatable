@@ -12,3 +12,6 @@ Delete the line when the feature ships.
   granular automation token (removes the manual OTP publish step).
 - StatusBadge dot indicator (`showDot`) — company-app keeps its own badge for
   the Confidence column only because of this.
+- Record coloring: row-level color rules by field value (Airtable parity). (gap matrix 2026-07-11)
+- Keyboard record navigation: arrow-key row focus + Enter opens the row. (gap matrix 2026-07-11)
+- CSV export / print of the current view. (gap matrix 2026-07-11)
