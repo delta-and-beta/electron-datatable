@@ -5,12 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.10.1] - 2026-07-12
+## [0.11.0] - 2026-07-12
+
+### Added
+
+- Source schema columns now expose `writable` and raw `fieldKind` metadata;
+  inferred table columns retain `fieldKind` in their public metadata.
+- Columns have a readable minimum width and wide fixed-layout tables scroll
+  horizontally instead of collapsing content (P6).
 
 ### Fixed
 
-- Columns no longer collapse below a readable minimum in fixed layout; wide
-  tables scroll horizontally.
+- Airtable pushes drop non-writable fields and reject malformed select or link
+  values per record instead of allowing destructive typecast writes.
+- Computed source fields and tags columns cannot enter inline editing.
+- Date-time editors preserve time-of-day, cleared numeric editors commit
+  `null`, and boolean editors commit actual booleans.
+- Tab-to-next-cell editing remains active when the consumer refreshes data
+  after the preceding commit.
 
 ## [0.10.0] - 2026-07-12
 

@@ -81,6 +81,10 @@ export interface ColumnDef<T extends object = RowData> {
   decimalPlaces?: number
   /** Literal currency symbol or prefix override */
   symbol?: string
+  /** Source-specific semantics retained by schema inference. */
+  meta?: {
+    fieldKind?: string
+  }
 }
 
 /** A single grouping level */

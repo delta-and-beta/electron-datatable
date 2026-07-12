@@ -28,6 +28,7 @@ interface AirtablePushResponse {
 interface AirtableField {
   name: string
   type: string
+  isComputed?: boolean
   options?: {
     symbol?: string
     precision?: number
@@ -62,6 +63,20 @@ const numberTypes = new Set([
 ])
 const dateTypes = new Set(['date', 'dateTime', 'createdTime', 'lastModifiedTime'])
 const tagsTypes = new Set(['multipleSelects', 'multipleRecordLinks', 'multipleLookupValues'])
+const computedTypes = new Set([
+  'formula',
+  'rollup',
+  'count',
+  'autoNumber',
+  'createdTime',
+  'lastModifiedTime',
+  'createdBy',
+  'lastModifiedBy',
+  'multipleLookupValues',
+  'button',
+])
+const arrayFieldKinds = new Set(['multipleSelects', 'multipleRecordLinks'])
+const typecastSensitiveFieldKinds = new Set([...arrayFieldKinds, 'singleSelect'])
 
 function sourceType(type: string): SourceColumnType {
   if (stringTypes.has(type)) return 'string'
@@ -110,6 +125,7 @@ export class AirtableSyncAdapter implements SyncAdapter {
   private readonly retryDelayMs: number
   private readonly rateLimitDelayMs: number
   private lastRequestAt: number | undefined
+  private schemaColumns: Map<string, SourceSchema['columns'][number]> | undefined
 
   constructor(private readonly options: AirtableSyncAdapterOptions) {
     this.id = `airtable:${options.baseId}/${options.table}`
@@ -131,14 +147,17 @@ export class AirtableSyncAdapter implements SyncAdapter {
       throw new Error(`Airtable table "${this.options.table}" was not found`)
     }
 
-    return {
+    const schema: SourceSchema = {
       columns: [
-        { name: 'airtable_id', sourceType: 'string' },
+        { name: 'airtable_id', sourceType: 'string', writable: false, fieldKind: 'recordId' },
         ...table.fields.map((field) => {
           const type = sourceType(field.type)
           return {
             name: field.name,
             sourceType: type,
+            fieldKind: field.type,
+            writable: !computedTypes.has(field.type)
+              && !(field.type === 'barcode' && field.isComputed === true),
             ...(type === 'currency'
               ? {
                   metadata: {
@@ -151,6 +170,8 @@ export class AirtableSyncAdapter implements SyncAdapter {
         }),
       ],
     }
+    this.schemaColumns = new Map(schema.columns.map((column) => [column.name, column]))
+    return schema
   }
 
   async pull(cursor?: SyncCursor): Promise<SyncPage> {
@@ -184,12 +205,61 @@ export class AirtableSyncAdapter implements SyncAdapter {
     const results: SyncPushRecordResult[] = []
     for (let index = 0; index < changes.length; index += this.pushBatchSize) {
       const batch = changes.slice(index, index + this.pushBatchSize)
-      results.push(...await this.pushBatch(batch))
+      const prepared = batch.map((change) => this.prepareChange(change))
+      const valid = prepared.filter((item) => item.change !== undefined)
+      const pushed = valid.length === 0
+        ? []
+        : await this.pushBatch(
+            valid.map((item) => item.change!),
+            !valid.some((item) => item.disableTypecast),
+          )
+      let pushedIndex = 0
+      for (const item of prepared) {
+        results.push(item.error ?? pushed[pushedIndex++])
+      }
     }
     return results
   }
 
-  private async pushBatch(changes: SyncPushChange[]): Promise<SyncPushRecordResult[]> {
+  private prepareChange(change: SyncPushChange): {
+    change?: SyncPushChange
+    disableTypecast: boolean
+    error?: SyncPushRecordResult
+  } {
+    const fields: Record<string, unknown> = {}
+    let disableTypecast = false
+    for (const [name, value] of Object.entries(change.fields)) {
+      if (name === 'airtable_id') continue
+      const schemaColumn = this.schemaColumns?.get(name)
+      if (schemaColumn?.writable === false) continue
+      const fieldKind = schemaColumn?.fieldKind
+      if (fieldKind !== undefined && typecastSensitiveFieldKinds.has(fieldKind)) {
+        const valid = value === null
+          || (arrayFieldKinds.has(fieldKind)
+            ? Array.isArray(value) && value.every((item) => typeof item === 'string')
+            : typeof value === 'string')
+        if (!valid) {
+          const expected = arrayFieldKinds.has(fieldKind) ? 'an array of strings' : 'a string'
+          return {
+            disableTypecast: false,
+            error: {
+              externalId: change.externalId,
+              ok: false,
+              error: `${name} must be ${expected} for Airtable ${fieldKind}`,
+            },
+          }
+        }
+        disableTypecast = true
+      }
+      fields[name] = value
+    }
+    return { change: { ...change, fields }, disableTypecast }
+  }
+
+  private async pushBatch(
+    changes: SyncPushChange[],
+    typecast = true,
+  ): Promise<SyncPushRecordResult[]> {
     try {
       const response = await this.requestWithBody('PATCH', `${this.options.baseId}/${this.options.table}`, {
         records: changes.map(({ externalId, fields }) => {
@@ -197,7 +267,7 @@ export class AirtableSyncAdapter implements SyncAdapter {
           delete pushFields.airtable_id
           return { id: externalId, fields: pushFields }
         }),
-        typecast: true,
+        typecast,
       }) as AirtablePushResponse
       const returnedIds = new Set(response.records.map(({ id }) => id))
       return changes.map(({ externalId }) => returnedIds.has(externalId)
@@ -206,7 +276,7 @@ export class AirtableSyncAdapter implements SyncAdapter {
     } catch (error) {
       if (this.getErrorNumber(error, 'status') === 422 && changes.length > 1) {
         const results: SyncPushRecordResult[] = []
-        for (const change of changes) results.push(...await this.pushBatch([change]))
+        for (const change of changes) results.push(...await this.pushBatch([change], typecast))
         return results
       }
       const message = this.getErrorMessage(error)

@@ -11,14 +11,28 @@ interface InlineCellEditorProps<T extends object> {
 
 function initialEditorValue<T extends object>(column: ColumnDef<T>, value: unknown): string {
   if (value === null || value === undefined) return ''
+  if (column.meta?.fieldKind === 'dateTime') {
+    const date = new Date(String(value))
+    if (Number.isNaN(date.getTime())) return String(value).slice(0, 16)
+    const pad = (part: number) => String(part).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+      + `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
   if (column.type === 'date') return String(value).slice(0, 10)
   return String(value)
 }
 
 function typedEditorValue<T extends object>(column: ColumnDef<T>, value: string): unknown {
-  return column.type === 'number' || column.type === 'currency'
-    ? Number(value)
-    : value
+  if (column.type === 'number' || column.type === 'currency') {
+    return value === '' ? null : Number(value)
+  }
+  if (column.meta?.fieldKind === 'dateTime') {
+    return value === '' ? '' : new Date(value).toISOString()
+  }
+  if (column.meta?.fieldKind === 'boolean' || column.meta?.fieldKind === 'checkbox') {
+    return value === 'true'
+  }
+  return value
 }
 
 function currencyPrefix<T extends object>(column: ColumnDef<T>): string {
@@ -108,7 +122,7 @@ export function InlineCellEditor<T extends object = RowData>({
       type={column.type === 'number' || column.type === 'currency'
         ? 'number'
         : column.type === 'date'
-          ? 'date'
+          ? column.meta?.fieldKind === 'dateTime' ? 'datetime-local' : 'date'
           : 'text'}
       step={column.type === 'number' || column.type === 'currency' ? 'any' : undefined}
       aria-label={`Edit ${column.label}`}

@@ -2,6 +2,10 @@ export interface SourceColumn {
   name: string
   sourceType: string
   nullable?: boolean
+  /** Whether the source accepts writes to this field. */
+  writable?: boolean
+  /** Adapter-native field type, retained for editor and write semantics. */
+  fieldKind?: string
   metadata?: {
     symbol?: string
     precision?: number

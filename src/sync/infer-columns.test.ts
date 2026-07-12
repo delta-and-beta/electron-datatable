@@ -55,4 +55,29 @@ describe('inferColumns', () => {
       currency: 'USD',
     }))
   })
+
+  it('exposes fieldKind metadata and prevents non-writable columns from being made editable', () => {
+    const schema = { columns: [{
+      name: 'Score',
+      sourceType: 'number',
+      writable: false,
+      fieldKind: 'formula',
+    }] }
+
+    expect(inferColumns(schema, { Score: { editable: true } })).toEqual([expect.objectContaining({
+      id: 'Score',
+      editable: false,
+      meta: { fieldKind: 'formula' },
+    })])
+  })
+
+  it('marks inferred booleans so editors commit boolean values', () => {
+    expect(inferColumns({ columns: [{ name: 'enabled', sourceType: 'boolean' }] })).toEqual([
+      expect.objectContaining({
+        id: 'enabled',
+        options: ['true', 'false'],
+        meta: { fieldKind: 'boolean' },
+      }),
+    ])
+  })
 })

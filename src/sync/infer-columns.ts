@@ -37,13 +37,19 @@ export function inferColumns(
   overrides: Record<string, Partial<ColumnDef>> = {},
 ): ColumnDef[] {
   return schema.columns.map((column) => {
+    const normalizedSourceType = column.sourceType.trim()
+    const inferredFieldKind = column.fieldKind
+      ?? (booleanTypes.test(normalizedSourceType) || normalizedSourceType === 'boolean'
+        ? 'boolean'
+        : undefined)
     const inferred: ColumnDef = {
       id: column.name,
       label: column.name,
       type: inferType(column.sourceType),
+      ...(inferredFieldKind === undefined ? {} : { meta: { fieldKind: inferredFieldKind } }),
     }
 
-    if (booleanTypes.test(column.sourceType.trim())) {
+    if (booleanTypes.test(normalizedSourceType) || normalizedSourceType === 'boolean') {
       inferred.options = ['true', 'false']
     }
 
@@ -53,6 +59,15 @@ export function inferColumns(
       inferred.minorUnits = false
     }
 
-    return { ...inferred, ...overrides[column.name] }
+    const override = overrides[column.name]
+    const resolved = {
+      ...inferred,
+      ...override,
+      ...(inferred.meta === undefined && override?.meta === undefined
+        ? {}
+        : { meta: { ...inferred.meta, ...override?.meta } }),
+    }
+    if (column.writable === false) resolved.editable = false
+    return resolved
   })
 }

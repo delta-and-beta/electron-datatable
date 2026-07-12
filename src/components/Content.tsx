@@ -105,7 +105,6 @@ export function Content<T extends object = RowData>({
   useEffect(() => {
     if (previousDataRef.current === data) return
     previousDataRef.current = data
-    setEditingCell(null)
     setOptimisticCells({})
   }, [data])
 
@@ -224,6 +223,7 @@ export function Content<T extends object = RowData>({
   const canEditColumn = (column: ColumnDef<T>) => (
     onCellEdit !== undefined
     && column.editable === true
+    && column.type !== 'tags'
     && column.render === undefined
     && renderCell === undefined
   )
