@@ -94,6 +94,52 @@ describe('Content', () => {
     expect(table.querySelector('colgroup')).toBeInTheDocument()
   })
 
+  it('materializes every painted column width before resizing one column', () => {
+    const resizeColumns: ColumnDef[] = Array.from({ length: 6 }, (_, index) => ({
+      id: `field${index + 1}`,
+      label: `Field ${index + 1}`,
+      type: 'text',
+    }))
+    const paintedWidths = [160, 180, 200, 220, 240, 260]
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const columnIndex = resizeColumns.findIndex((column) => (
+          this.textContent?.includes(column.label)
+        ))
+        return { width: paintedWidths[columnIndex] ?? 0 } as DOMRect
+      })
+
+    try {
+      const { container } = render(
+        <DataTable
+          columns={resizeColumns}
+          data={[Object.fromEntries([
+            ['id', '1'],
+            ...resizeColumns.map((column, index) => [column.id, `Value ${index + 1}`]),
+          ])]}
+          rowKey="id"
+          storageKey="materialize-resize-widths"
+          frozenColumns={1}
+          preset="minimal"
+        />,
+      )
+
+      const secondHeader = screen.getByText('Field 2').closest('th')!
+      fireEvent.mouseDown(within(secondHeader).getByTitle('Drag to resize'), { clientX: 100 })
+      fireEvent.mouseMove(document, { clientX: 160 })
+      fireEvent.mouseUp(document)
+
+      const colWidths = Array.from(container.querySelectorAll('col')).map((col) => col.style.width)
+      expect(colWidths).toEqual(['160px', '240px', '200px', '220px', '240px', '260px'])
+      expect(screen.getByText('Field 1').closest('th')).toHaveStyle({
+        left: '0px',
+        width: '160px',
+      })
+    } finally {
+      rectSpy.mockRestore()
+    }
+  })
+
   it('renders a complete colgroup with resolved and equal-share widths', () => {
     const fixedColumns: ColumnDef[] = [
       { id: 'name', label: 'Name', type: 'text', width: 120 },

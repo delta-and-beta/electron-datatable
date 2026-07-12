@@ -485,6 +485,12 @@ export function Content<T extends object = RowData>({
     const th = (e.currentTarget as HTMLElement).closest('th')
     const startX = e.clientX
     const startWidth = th ? th.getBoundingClientRect().width : 150
+    for (const visibleColumn of visibleColumns) {
+      const paintedWidth = headerRefs.current.get(visibleColumn.id)?.getBoundingClientRect().width
+      if (paintedWidth !== undefined && paintedWidth > 0) {
+        columnState.setColumnWidth(visibleColumn.id, Math.round(paintedWidth))
+      }
+    }
     const column = columns.find((candidate) => candidate.id === columnId)
     const minWidth = column?.minWidth ?? DEFAULT_MIN_COLUMN_WIDTH
     const minWidthPixels = pixelWidthValue(minWidth) ?? 0
