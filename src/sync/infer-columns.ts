@@ -52,6 +52,9 @@ export function inferColumns(
     if (booleanTypes.test(normalizedSourceType) || normalizedSourceType === 'boolean') {
       inferred.options = ['true', 'false']
     }
+    if (column.metadata?.options !== undefined) {
+      inferred.options = column.metadata.options
+    }
 
     if (column.sourceType.trim() === 'currency') {
       inferred.symbol = column.metadata?.symbol

@@ -66,6 +66,10 @@ export class SyncEngine {
     return this.run(true)
   }
 
+  /**
+   * Batches changes and delegates them directly to the adapter. Each adapter
+   * owns any schema loading and validation needed when push is called first.
+   */
   async push(changes: SyncPushChange[]): Promise<SyncPushRecordResult[]> {
     if (this.adapter.capabilities?.canPush !== true || this.adapter.push === undefined) {
       throw new TypeError(`Sync adapter "${this.adapter.id}" is not configured for push`)

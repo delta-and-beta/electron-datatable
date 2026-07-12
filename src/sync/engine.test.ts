@@ -63,6 +63,24 @@ describe('SyncEngine', () => {
     expect(results.map(({ externalId }) => externalId)).toEqual(changes.map(({ externalId }) => externalId))
   })
 
+  it('leaves push-time schema preparation to the adapter', async () => {
+    const describeSchema = vi.fn().mockResolvedValue({ columns: [] })
+    const push = vi.fn().mockResolvedValue([{ externalId: 'one', ok: true }])
+    const adapter = createMockAdapter({
+      capabilities: { snapshotConsistent: true, canPush: true },
+      describeSchema,
+      push,
+    })
+
+    await expect(new SyncEngine(adapter, createMockTarget(), {
+      externalIdField: 'id',
+    }).push([{ externalId: 'one', fields: { Name: 'One' } }]))
+      .resolves.toEqual([{ externalId: 'one', ok: true }])
+
+    expect(push).toHaveBeenCalledOnce()
+    expect(describeSchema).not.toHaveBeenCalled()
+  })
+
   it('marks only a failed push batch and continues remaining batches without target transactions', async () => {
     const push = vi.fn()
       .mockResolvedValueOnce([

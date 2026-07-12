@@ -9,6 +9,8 @@ export interface SourceColumn {
   metadata?: {
     symbol?: string
     precision?: number
+    /** Existing option names reported by the source schema. */
+    options?: string[]
   }
 }
 
@@ -58,6 +60,10 @@ export interface SyncAdapter {
   readonly pushBatchSize?: number
   describeSchema(): Promise<SourceSchema>
   pull(cursor?: SyncCursor): Promise<SyncPage>
+  /**
+   * Pushes source changes. Adapters own any schema discovery, caching, and
+   * validation required to make this safe when push is the first operation.
+   */
   push?(changes: SyncPushChange[]): Promise<SyncPushRecordResult[]>
   close?(): Promise<void>
 }

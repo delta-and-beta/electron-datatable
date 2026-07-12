@@ -106,7 +106,21 @@ export function Content<T extends object = RowData>({
     if (previousDataRef.current === data) return
     previousDataRef.current = data
     setOptimisticCells({})
-  }, [data])
+    // A refresh invalidates an active draft only when its source cell vanished
+    // or changed. This prevents stale drafts from overwriting newer remote data
+    // while preserving Tab-to-next editing when an unrelated field refreshes.
+    setEditingCell((current) => {
+      if (current === null) return null
+      const currentRowId = String(asRecord(current.row)[rowKey])
+      const refreshedRow = data.find((candidate) => (
+        String(asRecord(candidate)[rowKey]) === currentRowId
+      ))
+      if (refreshedRow === undefined) return null
+      return Object.is(asRecord(refreshedRow)[current.column.id], current.value)
+        ? current
+        : null
+    })
+  }, [data, rowKey])
 
   useLayoutEffect(() => {
     const measure = () => {
