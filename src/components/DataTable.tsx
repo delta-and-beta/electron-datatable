@@ -211,6 +211,7 @@ function DataTableRoot<T extends object = RowData>({
     attachmentAdapter.getCounts(ids).then(setAttachmentCounts).catch(() => {})
   }, [attachmentAdapter, data, rowKey])
   const openFilterPanel = useCallback(() => setFilterMenuOpen(true), [])
+  const filterPanelMounted = preset === 'full' && !children
 
   // Load attachment counts on mount and when data changes
   useEffect(() => {
@@ -245,7 +246,7 @@ function DataTableRoot<T extends object = RowData>({
       onCellEdit,
       onCellEditError,
       columnMenuItems,
-      openFilterPanel,
+      openFilterPanel: filterPanelMounted ? openFilterPanel : undefined,
     }),
     [
       data,
@@ -270,6 +271,7 @@ function DataTableRoot<T extends object = RowData>({
       onCellEdit,
       onCellEditError,
       columnMenuItems,
+      filterPanelMounted,
       openFilterPanel,
     ],
   )

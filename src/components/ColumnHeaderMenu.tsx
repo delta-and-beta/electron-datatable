@@ -60,7 +60,7 @@ export function ColumnHeaderMenu<T extends object = RowData>({
       disabled: !sortable,
       disabledReason: !sortable ? 'Sorting is disabled for this field' : undefined,
     },
-    {
+    ...(openFilterPanel === undefined ? [] : [{
       key: 'filter',
       label: 'Filter by this field',
       icon: <Filter />,
@@ -70,7 +70,7 @@ export function ColumnHeaderMenu<T extends object = RowData>({
       },
       disabled: !filterable,
       disabledReason: !filterable ? 'Filtering is disabled for this field' : undefined,
-    },
+    }]),
     {
       key: 'group',
       label: 'Group by this field',

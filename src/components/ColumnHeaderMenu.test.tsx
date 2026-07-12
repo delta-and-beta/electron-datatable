@@ -58,6 +58,21 @@ describe('ColumnHeaderMenu', () => {
     expect(within(panel).getByDisplayValue('Name')).toBeInTheDocument()
   })
 
+  it.each(['minimal', 'none'] as const)(
+    'omits filtering when the %s preset mounts no filter panel',
+    (preset) => {
+      render(
+        <DataTable columns={columns} data={data} rowKey="id" preset={preset}>
+          {preset === 'none' ? <DataTable.Content /> : undefined}
+        </DataTable>,
+      )
+
+      expect(within(openMenu()).queryByRole('button', {
+        name: 'Filter by this field',
+      })).not.toBeInTheDocument()
+    },
+  )
+
   it('groups, freezes through the visible index, and hides the field', () => {
     const view = render(
       <DataTable columns={columns} data={data} rowKey="id" storageKey="header-actions" preset="full" />,
@@ -89,7 +104,7 @@ describe('ColumnHeaderMenu', () => {
         columns={restricted}
         data={[{ id: '1', tags: ['One'] }]}
         rowKey="id"
-        preset="minimal"
+        preset="full"
       />,
     )
 
