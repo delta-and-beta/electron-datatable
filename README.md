@@ -368,6 +368,7 @@ Returns `{ columns, rowKey, storageKey, defaultSort, defaultGroupBy }` — sprea
   render?: (value: unknown, row: T) => ReactNode
   headerRender?: () => ReactNode
   width?: string                      // e.g. '200px', '20%'
+  minWidth?: string                   // CSS length; defaults to 140px
   align?: 'left' | 'center' | 'right'
 
   // Behavior (all default to true)
@@ -386,6 +387,11 @@ Returns `{ columns, rowKey, storageKey, defaultSort, defaultGroupBy }` — sprea
   currency?: string                   // ISO 4217 (e.g. 'USD', 'EUR')
 }
 ```
+
+Fixed-layout columns clamp resolved and manually resized widths to `minWidth`.
+When their combined minimum exceeds the container, the existing table wrapper
+scrolls horizontally. `DEFAULT_MIN_COLUMN_WIDTH` is exported from the package
+root for consumers that need the default `'140px'` value.
 
 ### `DataTableProps<T>`
 

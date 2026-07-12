@@ -44,6 +44,11 @@ export interface ColumnDef<T extends object = RowData> {
   render?: (value: unknown, row: T) => ReactNode
   headerRender?: () => ReactNode
   width?: string
+  /**
+   * Readable width floor used by fixed table layout and manual resizing.
+   * Accepts any CSS length and defaults to `DEFAULT_MIN_COLUMN_WIDTH`.
+   */
+  minWidth?: string
   align?: 'left' | 'center' | 'right'
   badgeVariants?: Record<string, BadgeVariant>
 

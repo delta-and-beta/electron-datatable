@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] - 2026-07-12
+
+### Fixed
+
+- Columns no longer collapse below a readable minimum in fixed layout; wide
+  tables scroll horizontally.
+
 ## [0.10.0] - 2026-07-12
 
 ### Added
