@@ -56,7 +56,7 @@ describe('inferColumns', () => {
     }))
   })
 
-  it('exposes fieldKind metadata and prevents non-writable columns from being made editable', () => {
+  it('retains source writability and prevents non-writable columns from being made editable', () => {
     const schema = { columns: [{
       name: 'Score',
       sourceType: 'number',
@@ -67,8 +67,48 @@ describe('inferColumns', () => {
     expect(inferColumns(schema, { Score: { editable: true } })).toEqual([expect.objectContaining({
       id: 'Score',
       editable: false,
-      meta: { fieldKind: 'formula' },
+      meta: { fieldKind: 'formula', writable: false },
     })])
+  })
+
+  it('retains writable metadata for writable source columns', () => {
+    expect(inferColumns({
+      columns: [{ name: 'Name', sourceType: 'string', writable: true }],
+    })[0]).toEqual(expect.objectContaining({
+      meta: { writable: true },
+    }))
+  })
+
+  it('changing display type cannot make a non-writable source column editable', () => {
+    expect(inferColumns({
+      columns: [{ name: 'Computed', sourceType: 'number', writable: false }],
+    }, {
+      Computed: { type: 'currency', editable: true },
+    })[0]).toEqual(expect.objectContaining({
+      type: 'currency',
+      editable: false,
+      meta: { writable: false },
+    }))
+  })
+
+  it('does not let overrides rewrite source writability or unlock resolved non-writable metadata', () => {
+    expect(inferColumns({
+      columns: [{ name: 'Computed', sourceType: 'number', writable: false }],
+    }, {
+      Computed: { editable: true, meta: { writable: true } },
+    })[0]).toEqual(expect.objectContaining({
+      editable: false,
+      meta: { writable: false },
+    }))
+
+    expect(inferColumns({
+      columns: [{ name: 'LocallyLocked', sourceType: 'string' }],
+    }, {
+      LocallyLocked: { editable: true, meta: { writable: false } },
+    })[0]).toEqual(expect.objectContaining({
+      editable: false,
+      meta: { writable: false },
+    }))
   })
 
   it('marks inferred booleans so editors commit boolean values', () => {

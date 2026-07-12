@@ -42,11 +42,15 @@ export function inferColumns(
       ?? (booleanTypes.test(normalizedSourceType) || normalizedSourceType === 'boolean'
         ? 'boolean'
         : undefined)
+    const inferredMeta = {
+      ...(inferredFieldKind === undefined ? {} : { fieldKind: inferredFieldKind }),
+      ...(column.writable === undefined ? {} : { writable: column.writable }),
+    }
     const inferred: ColumnDef = {
       id: column.name,
       label: column.name,
       type: inferType(column.sourceType),
-      ...(inferredFieldKind === undefined ? {} : { meta: { fieldKind: inferredFieldKind } }),
+      ...(Object.keys(inferredMeta).length === 0 ? {} : { meta: inferredMeta }),
     }
 
     if (booleanTypes.test(normalizedSourceType) || normalizedSourceType === 'boolean') {
@@ -70,7 +74,10 @@ export function inferColumns(
         ? {}
         : { meta: { ...inferred.meta, ...override?.meta } }),
     }
-    if (column.writable === false) resolved.editable = false
+    if (column.writable !== undefined) {
+      resolved.meta = { ...resolved.meta, writable: column.writable }
+    }
+    if (resolved.meta?.writable === false) resolved.editable = false
     return resolved
   })
 }

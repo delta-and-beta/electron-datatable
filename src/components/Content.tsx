@@ -9,6 +9,7 @@ import { asRecord } from '../lib/as-record'
 import { ACTIONS_COLUMN_ID } from '../actions'
 import { renderColumnValue } from './render-column-value'
 import { InlineCellEditor } from './InlineCellEditor'
+import { ColumnHeaderMenu } from './ColumnHeaderMenu'
 import {
   DEFAULT_MIN_COLUMN_WIDTH,
   clampColumnWidth,
@@ -613,7 +614,7 @@ export function Content<T extends object = RowData>({
                 scope="col"
                 aria-sort={ariaSortValue}
                 className={cn(
-                  'relative',
+                  'group relative pr-10',
                   align === 'right' && 'text-right',
                   align === 'center' && 'text-center',
                   isFrozen && 'dt-frozen-header sticky z-30',
@@ -642,6 +643,9 @@ export function Content<T extends object = RowData>({
                     {col.headerRender ? col.headerRender() : col.label}
                   </span>
                 )}
+                {col.id !== ACTIONS_COLUMN_ID ? (
+                  <ColumnHeaderMenu column={col} visibleIndex={visibleColumns.indexOf(col)} />
+                ) : null}
                 {col.id !== ACTIONS_COLUMN_ID && (
                   <span
                     role="separator"
@@ -649,7 +653,7 @@ export function Content<T extends object = RowData>({
                     onMouseDown={(e) => startResize(e, col.id)}
                     onClick={(e) => e.stopPropagation()}
                     title="Drag to resize"
-                    className="absolute top-0 right-0 z-10 h-full w-1.5 cursor-col-resize select-none hover:bg-dt-primary/50"
+                    className="absolute top-0 right-0 z-20 h-full w-1.5 cursor-col-resize select-none hover:bg-dt-primary/50"
                   />
                 )}
               </TableHead>

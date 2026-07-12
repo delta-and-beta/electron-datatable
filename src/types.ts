@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import type { BadgeVariant } from './components/StatusBadge'
 import type { FooterKpi } from './components/Footer'
 import type { SortLevel } from './lib/sort'
@@ -24,6 +24,18 @@ export type BulkAction<T extends object> = {
   onClick: (rows: T[]) => void | Promise<void>
   variant?: 'default' | 'danger'
   show?: (rows: T[]) => boolean
+}
+
+/** A consumer-supplied action appended to a column header menu. */
+export interface ColumnMenuItem {
+  key: string
+  label: string
+  icon?: ReactElement
+  onSelect: () => void
+  variant?: 'default' | 'danger'
+  separatorBefore?: boolean
+  disabled?: boolean
+  disabledReason?: string
 }
 
 /** Date bucketing period for group-by */
@@ -84,6 +96,7 @@ export interface ColumnDef<T extends object = RowData> {
   /** Source-specific semantics retained by schema inference. */
   meta?: {
     fieldKind?: string
+    writable?: boolean
   }
 }
 
@@ -241,6 +254,8 @@ export interface DataTableProps<T extends object = RowData> {
   onCellEdit?: (row: T, columnId: string, nextValue: unknown) => void | Promise<void>
   /** Called after an async or synchronous `onCellEdit` failure. */
   onCellEditError?: (error: unknown, row: T, columnId: string) => void
+  /** Adds source-specific actions after the built-in column view actions. */
+  columnMenuItems?: (column: ColumnDef<T>) => ColumnMenuItem[]
   toolbarExtra?: ReactNode
   footerKpis?: FooterKpi[]
   className?: string

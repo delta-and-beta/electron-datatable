@@ -3,6 +3,7 @@ export type {
   RowData,
   RowAction,
   BulkAction,
+  ColumnMenuItem,
   ColumnDef,
   DatePeriod,
   GroupLevel,
@@ -69,6 +70,16 @@ export { Footer } from './components/Footer'
 export type { FooterKpi } from './components/Footer'
 export { Popover } from './components/Popover'
 export { ViewsMenu } from './components/ViewsMenu'
+export { MenuItem } from './components/MenuItem'
+export type { MenuItemProps } from './components/MenuItem'
+export { ColumnHeaderMenu } from './components/ColumnHeaderMenu'
+export type { ColumnHeaderMenuProps } from './components/ColumnHeaderMenu'
+export { FieldEditor } from './components/FieldEditor'
+export type {
+  FieldEditorProps,
+  FieldEditorValue,
+  FieldTypeOption,
+} from './components/FieldEditor'
 export { GroupByToolbarButton } from './components/toolbar/GroupByToolbarButton'
 export { GroupByConfigPanel } from './components/toolbar/GroupByConfigPanel'
 export { SortToolbarButton } from './components/toolbar/SortToolbarButton'

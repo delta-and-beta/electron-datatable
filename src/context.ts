@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { ProviderProps, ReactNode } from 'react'
-import type { RowData, ColumnDef, GroupedSection, AttachmentAdapter, KanbanConfig } from './types'
+import type { RowData, ColumnDef, GroupedSection, AttachmentAdapter, KanbanConfig, ColumnMenuItem } from './types'
 import type { useGroupBy } from './hooks/useGroupBy'
 import type { useColumns } from './hooks/useColumns'
 import type { useSort } from './hooks/useSort'
@@ -54,6 +54,8 @@ export interface DataTableContextValue<T extends object = RowData> {
   onRowClick?: (row: T) => void
   onCellEdit?: (row: T, columnId: string, nextValue: unknown) => void | Promise<void>
   onCellEditError?: (error: unknown, row: T, columnId: string) => void
+  columnMenuItems?: (column: ColumnDef<T>) => ColumnMenuItem[]
+  openFilterPanel: () => void
 }
 
 const DataTableContext = createContext<DataTableContextValue | null>(null)
