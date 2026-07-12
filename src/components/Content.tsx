@@ -9,6 +9,12 @@ import { asRecord } from '../lib/as-record'
 import { ACTIONS_COLUMN_ID } from '../actions'
 import { renderColumnValue } from './render-column-value'
 import { InlineCellEditor } from './InlineCellEditor'
+import {
+  DEFAULT_MIN_COLUMN_WIDTH,
+  clampColumnWidth,
+  pixelWidthValue,
+  toCssWidth,
+} from '../column-width'
 
 /** Resolve effective text alignment — currency/number default to right */
 function getAlign<T extends object>(col: ColumnDef<T>): 'left' | 'center' | 'right' {
@@ -22,10 +28,6 @@ function pixelWidth(width: string | number | undefined, measured?: number): numb
     return Number.parseFloat(width)
   }
   return 0
-}
-
-function cssWidth(width: string | number): string {
-  return typeof width === 'number' ? `${width}px` : width
 }
 
 /* ---------------------------------------------------------------------------
@@ -103,7 +105,6 @@ export function Content<T extends object = RowData>({
   useEffect(() => {
     if (previousDataRef.current === data) return
     previousDataRef.current = data
-    setEditingCell(null)
     setOptimisticCells({})
   }, [data])
 
@@ -137,7 +138,7 @@ export function Content<T extends object = RowData>({
     }
   }, [visibleColumnSignature])
 
-  const resolvedWidths = Object.fromEntries(
+  const configuredWidths = Object.fromEntries(
     visibleColumns.map((column) => [
       column.id,
       columnState.widths[column.id] ?? column.width,
@@ -145,22 +146,41 @@ export function Content<T extends object = RowData>({
   ) as Record<string, string | number | undefined>
   const selectionWidth = 44
   const hasAttachments = attachmentAdapter !== null
-  const hasResolvedWidth = visibleColumns.some((column) => resolvedWidths[column.id] !== undefined)
+  const hasResolvedWidth = visibleColumns.some((column) => configuredWidths[column.id] !== undefined)
   const unresolvedColumnCount = visibleColumns.filter(
-    (column) => resolvedWidths[column.id] === undefined,
+    (column) => configuredWidths[column.id] === undefined,
   ).length
   const reservedWidths = [
     ...(selection.enabled ? [`${selectionWidth}px`] : []),
     ...(hasAttachments ? ['50px'] : []),
     ...visibleColumns.flatMap((column) => {
-      const width = resolvedWidths[column.id]
-      return width === undefined ? [] : [cssWidth(width)]
+      const width = configuredWidths[column.id]
+      return width === undefined ? [] : [toCssWidth(width)]
     }),
   ]
   const equalShareWidth = unresolvedColumnCount > 0
     ? reservedWidths.length > 0
       ? `calc((100% - ${reservedWidths.join(' - ')}) / ${unresolvedColumnCount})`
       : `${100 / unresolvedColumnCount}%`
+    : undefined
+  const resolvedWidths = Object.fromEntries(
+    visibleColumns.map((column) => {
+      const width = configuredWidths[column.id] ?? (hasResolvedWidth ? equalShareWidth : undefined)
+      if (width === undefined || column.id === ACTIONS_COLUMN_ID) {
+        return [column.id, width]
+      }
+      return [column.id, clampColumnWidth(width, column.minWidth)]
+    }),
+  ) as Record<string, string | undefined>
+  const tableMinWidth = hasResolvedWidth
+    ? `calc(${[
+        ...(selection.enabled ? [`${selectionWidth}px`] : []),
+        ...(hasAttachments ? ['50px'] : []),
+        ...visibleColumns.flatMap((column) => {
+          const width = resolvedWidths[column.id]
+          return width === undefined ? [] : [width]
+        }),
+      ].join(' + ')})`
     : undefined
 
   const configurableVisibleColumns = visibleColumns.filter(
@@ -203,6 +223,7 @@ export function Content<T extends object = RowData>({
   const canEditColumn = (column: ColumnDef<T>) => (
     onCellEdit !== undefined
     && column.editable === true
+    && column.type !== 'tags'
     && column.render === undefined
     && renderCell === undefined
   )
@@ -464,8 +485,20 @@ export function Content<T extends object = RowData>({
     const th = (e.currentTarget as HTMLElement).closest('th')
     const startX = e.clientX
     const startWidth = th ? th.getBoundingClientRect().width : 150
+    for (const visibleColumn of visibleColumns) {
+      const paintedWidth = headerRefs.current.get(visibleColumn.id)?.getBoundingClientRect().width
+      if (paintedWidth !== undefined && paintedWidth > 0) {
+        columnState.setColumnWidth(visibleColumn.id, Math.round(paintedWidth))
+      }
+    }
+    const column = columns.find((candidate) => candidate.id === columnId)
+    const minWidth = column?.minWidth ?? DEFAULT_MIN_COLUMN_WIDTH
+    const minWidthPixels = pixelWidthValue(minWidth) ?? 0
     const onMove = (ev: MouseEvent) => {
-      columnState.setColumnWidth(columnId, Math.max(60, Math.round(startWidth + (ev.clientX - startX))))
+      columnState.setColumnWidth(
+        columnId,
+        Math.max(minWidthPixels, Math.round(startWidth + (ev.clientX - startX))),
+      )
     }
     const onUp = () => {
       document.removeEventListener('mousemove', onMove)
@@ -484,7 +517,13 @@ export function Content<T extends object = RowData>({
    * ----------------------------------------------------------------------- */
 
   return (
-    <Table className={className} style={{ tableLayout: hasResolvedWidth ? 'fixed' : 'auto' }}>
+    <Table
+      className={className}
+      style={{
+        tableLayout: hasResolvedWidth ? 'fixed' : 'auto',
+        minWidth: tableMinWidth,
+      }}
+    >
       {hasResolvedWidth && (
         <colgroup>
           {selection.enabled && <col style={{ width: selectionWidth }} />}
@@ -577,13 +616,17 @@ export function Content<T extends object = RowData>({
                   <button
                     type="button"
                     onClick={() => sort.setSort(col.id)}
-                    className="inline-flex items-center gap-0.5 cursor-pointer select-none bg-transparent border-none p-0 font-medium text-dt-muted hover:text-dt-text"
+                    className="inline-flex max-w-full min-w-0 items-center gap-0.5 cursor-pointer select-none bg-transparent border-none p-0 font-medium text-dt-muted hover:text-dt-text"
                   >
-                    {col.headerRender ? col.headerRender() : col.label}
+                    <span className="min-w-0 truncate">
+                      {col.headerRender ? col.headerRender() : col.label}
+                    </span>
                     {renderSortIcon(col.id)}
                   </button>
                 ) : (
-                  col.headerRender ? col.headerRender() : col.label
+                  <span className="block min-w-0 truncate">
+                    {col.headerRender ? col.headerRender() : col.label}
+                  </span>
                 )}
                 {col.id !== ACTIONS_COLUMN_ID && (
                   <span

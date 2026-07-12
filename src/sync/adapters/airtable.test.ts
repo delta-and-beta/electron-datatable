@@ -54,6 +54,108 @@ describe('AirtableSyncAdapter', () => {
     })
   })
 
+  it('drops computed fields from pushes after caching Airtable metadata', async () => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [
+        { name: 'Name', type: 'singleLineText' },
+        { name: 'Score', type: 'formula' },
+      ],
+    }] })
+    const requestWithBody = vi.fn().mockResolvedValue({ records: [{ id: 'rec1', fields: {} }] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request, requestWithBody }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+    await adapter.describeSchema()
+
+    await expect(adapter.push([{ externalId: 'rec1', fields: {
+      Name: 'Updated',
+      Score: 99,
+    } }])).resolves.toEqual([{ externalId: 'rec1', ok: true }])
+
+    expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/tblCompanies', {
+      records: [{ id: 'rec1', fields: { Name: 'Updated' } }],
+      typecast: true,
+    })
+  })
+
+  it.each([
+    ['Tags', 'multipleSelects', 'Gold'],
+    ['Owner', 'multipleRecordLinks', 'recOwner'],
+    ['Stage', 'singleSelect', ['Won']],
+  ])('rejects wrong-shaped %s values per record without sending them', async (field, fieldKind, value) => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [
+        { name: 'Name', type: 'singleLineText' },
+        { name: field, type: fieldKind },
+      ],
+    }] })
+    const requestWithBody = vi.fn().mockResolvedValue({ records: [{ id: 'recGood', fields: {} }] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request, requestWithBody }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+    await adapter.describeSchema()
+
+    const results = await adapter.push([
+      { externalId: 'recBad', fields: { [field]: value } },
+      { externalId: 'recGood', fields: { Name: 'Safe' } },
+    ])
+
+    expect(results).toEqual([
+      { externalId: 'recBad', ok: false, error: expect.stringContaining(`${field} must be`) },
+      { externalId: 'recGood', ok: true },
+    ])
+    expect(requestWithBody).toHaveBeenCalledOnce()
+    expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/tblCompanies', {
+      records: [{ id: 'recGood', fields: { Name: 'Safe' } }],
+      typecast: true,
+    })
+  })
+
+  it('sends correctly shaped select and link values with typecast disabled', async () => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [
+        { name: 'Tags', type: 'multipleSelects' },
+        { name: 'Owner', type: 'multipleRecordLinks' },
+        { name: 'Stage', type: 'singleSelect' },
+      ],
+    }] })
+    const requestWithBody = vi.fn().mockResolvedValue({ records: [{ id: 'rec1', fields: {} }] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request, requestWithBody }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+    await adapter.describeSchema()
+
+    await adapter.push([{ externalId: 'rec1', fields: {
+      Tags: ['Gold'],
+      Owner: ['recOwner'],
+      Stage: 'Won',
+    } }])
+
+    expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/tblCompanies', {
+      records: [{ id: 'rec1', fields: {
+        Tags: ['Gold'],
+        Owner: ['recOwner'],
+        Stage: 'Won',
+      } }],
+      typecast: false,
+    })
+  })
+
   it('retries a rejected batch as individual records to isolate a 422 offender', async () => {
     const requestWithBody = vi.fn()
       .mockRejectedValueOnce(Object.assign(new Error('invalid request'), { status: 422 }))
@@ -205,6 +307,9 @@ describe('AirtableSyncAdapter', () => {
       ['multipleLookupValues', 'tags'],
       ['formula', 'custom'],
       ['rollup', 'custom'],
+      ['count', 'custom'],
+      ['createdBy', 'custom'],
+      ['lastModifiedBy', 'custom'],
       ['barcode', 'custom'],
       ['button', 'custom'],
       ['multipleAttachments', 'custom'],
@@ -230,15 +335,54 @@ describe('AirtableSyncAdapter', () => {
 
     expect(request).toHaveBeenCalledWith('meta/bases/appBase/tables')
     expect(schema.columns).toEqual([
-      { name: 'airtable_id', sourceType: 'string' },
-      ...fields.map(([, sourceType], index) => ({
+      { name: 'airtable_id', sourceType: 'string', writable: false, fieldKind: 'recordId' },
+      ...fields.map(([fieldKind, sourceType], index) => ({
         name: `Field ${index}`,
         sourceType,
+        fieldKind,
+        writable: ![
+          'formula',
+          'rollup',
+          'count',
+          'autoNumber',
+          'createdTime',
+          'lastModifiedTime',
+          'createdBy',
+          'lastModifiedBy',
+          'multipleLookupValues',
+          'button',
+        ].includes(fieldKind),
         ...(sourceType === 'currency'
           ? { metadata: { symbol: '$', precision: 2 } }
           : {}),
       })),
     ])
+  })
+
+  it('marks computed barcode metadata as non-writable', async () => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [{ name: 'Generated barcode', type: 'barcode', isComputed: true }],
+    }] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+
+    await expect(adapter.describeSchema()).resolves.toEqual({
+      columns: [
+        { name: 'airtable_id', sourceType: 'string', writable: false, fieldKind: 'recordId' },
+        {
+          name: 'Generated barcode',
+          sourceType: 'custom',
+          writable: false,
+          fieldKind: 'barcode',
+        },
+      ],
+    })
   })
 
   it('carries Airtable currency metadata through inferred column formatting', async () => {
@@ -262,6 +406,8 @@ describe('AirtableSyncAdapter', () => {
     expect(schema.columns).toContainEqual({
       name: 'Budget',
       sourceType: 'currency',
+      fieldKind: 'currency',
+      writable: true,
       metadata: { symbol: 'HK$', precision: 3 },
     })
     expect(inferColumns(schema)).toContainEqual(expect.objectContaining({
@@ -293,7 +439,12 @@ describe('AirtableSyncAdapter', () => {
     })
 
     await expect(byName.describeSchema()).resolves.toEqual({
-      columns: [{ name: 'airtable_id', sourceType: 'string' }],
+      columns: [{
+        name: 'airtable_id',
+        sourceType: 'string',
+        fieldKind: 'recordId',
+        writable: false,
+      }],
     })
     await expect(missing.describeSchema()).rejects.toThrow('Airtable table "Missing" was not found')
   })

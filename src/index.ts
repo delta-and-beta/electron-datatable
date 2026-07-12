@@ -27,6 +27,7 @@ export type {
 // Config helpers
 export { defineTable, defineColumns } from './defineTable'
 export { makeActionsColumn } from './actions'
+export { DEFAULT_MIN_COLUMN_WIDTH } from './column-width'
 export {
   applyDataTableTheme,
   setDataTableThemeMode,

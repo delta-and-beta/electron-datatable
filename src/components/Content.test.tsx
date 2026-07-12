@@ -3,6 +3,8 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import { DataTable } from './DataTable'
 import type { ColumnDef, RowAction } from '../types'
 
+const EXPECTED_DEFAULT_MIN_COLUMN_WIDTH = '140px'
+
 const columns: ColumnDef[] = [
   { id: 'name', label: 'Name', type: 'text' },
   { id: 'amount', label: 'Amount', type: 'number' },
@@ -92,6 +94,52 @@ describe('Content', () => {
     expect(table.querySelector('colgroup')).toBeInTheDocument()
   })
 
+  it('materializes every painted column width before resizing one column', () => {
+    const resizeColumns: ColumnDef[] = Array.from({ length: 6 }, (_, index) => ({
+      id: `field${index + 1}`,
+      label: `Field ${index + 1}`,
+      type: 'text',
+    }))
+    const paintedWidths = [160, 180, 200, 220, 240, 260]
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const columnIndex = resizeColumns.findIndex((column) => (
+          this.textContent?.includes(column.label)
+        ))
+        return { width: paintedWidths[columnIndex] ?? 0 } as DOMRect
+      })
+
+    try {
+      const { container } = render(
+        <DataTable
+          columns={resizeColumns}
+          data={[Object.fromEntries([
+            ['id', '1'],
+            ...resizeColumns.map((column, index) => [column.id, `Value ${index + 1}`]),
+          ])]}
+          rowKey="id"
+          storageKey="materialize-resize-widths"
+          frozenColumns={1}
+          preset="minimal"
+        />,
+      )
+
+      const secondHeader = screen.getByText('Field 2').closest('th')!
+      fireEvent.mouseDown(within(secondHeader).getByTitle('Drag to resize'), { clientX: 100 })
+      fireEvent.mouseMove(document, { clientX: 160 })
+      fireEvent.mouseUp(document)
+
+      const colWidths = Array.from(container.querySelectorAll('col')).map((col) => col.style.width)
+      expect(colWidths).toEqual(['160px', '240px', '200px', '220px', '240px', '260px'])
+      expect(screen.getByText('Field 1').closest('th')).toHaveStyle({
+        left: '0px',
+        width: '160px',
+      })
+    } finally {
+      rectSpy.mockRestore()
+    }
+  })
+
   it('renders a complete colgroup with resolved and equal-share widths', () => {
     const fixedColumns: ColumnDef[] = [
       { id: 'name', label: 'Name', type: 'text', width: 120 },
@@ -113,9 +161,145 @@ describe('Content', () => {
 
     expect(table).toHaveStyle({ tableLayout: 'fixed' })
     expect(colWidths).toHaveLength(3)
-    expect(colWidths[0]).toBe('120px')
+    expect(colWidths[0]).toBe('140px')
     expect(colWidths[1]).not.toBe('')
     expect(colWidths[1]).toBe(colWidths[2])
+  })
+
+  it('clamps a narrow 20-column fixed table and gives it horizontal overflow width', () => {
+    const wideColumns: ColumnDef[] = Array.from({ length: 20 }, (_, index) => ({
+      id: `field${index}`,
+      label: `Field ${index}`,
+      type: 'text',
+      ...(index === 0 ? { width: '80px' } : {}),
+    }))
+    const row = Object.fromEntries([
+      ['id', '1'],
+      ...wideColumns.map((column, index) => [column.id, `Value ${index}`]),
+    ])
+    const { container } = render(
+      <div style={{ width: 320 }}>
+        <DataTable
+          columns={wideColumns}
+          data={[row]}
+          rowKey="id"
+          storageKey="narrow-twenty-columns"
+          preset="full"
+        />
+      </div>,
+    )
+
+    const table = container.querySelector('table')!
+    const cols = Array.from(table.querySelectorAll('col'))
+    const colWidths = cols.map((col) => col.style.width)
+
+    expect(cols).toHaveLength(20)
+    expect(colWidths[0]).toBe(EXPECTED_DEFAULT_MIN_COLUMN_WIDTH)
+    expect(colWidths.every((width) => width.includes(EXPECTED_DEFAULT_MIN_COLUMN_WIDTH))).toBe(true)
+    const equalShare = 'calc((100% - 80px) / 19)'
+    const expectedWidths = [
+      EXPECTED_DEFAULT_MIN_COLUMN_WIDTH,
+      ...Array.from(
+        { length: 19 },
+        () => `max(${equalShare}, ${EXPECTED_DEFAULT_MIN_COLUMN_WIDTH})`,
+      ),
+    ]
+    expect(table.style.minWidth).toBe(`calc(${expectedWidths.join(' + ')})`)
+    expect(table.closest('.overflow-auto')).toBeInTheDocument()
+  })
+
+  it('clamps resize drags at the column minimum width', () => {
+    render(
+      <DataTable
+        columns={[{ id: 'name', label: 'Name', type: 'text', width: '200px' }]}
+        data={[{ id: '1', name: 'Alice' }]}
+        rowKey="id"
+        storageKey="resize-minimum"
+        preset="minimal"
+      />,
+    )
+
+    const nameHeader = screen.getByText('Name').closest('th')!
+    nameHeader.getBoundingClientRect = () => ({ width: 200 } as DOMRect)
+    fireEvent.mouseDown(within(nameHeader).getByTitle('Drag to resize'), { clientX: 200 })
+    fireEvent.mouseMove(document, { clientX: 0 })
+    fireEvent.mouseUp(document)
+
+    expect(nameHeader).toHaveStyle({ width: EXPECTED_DEFAULT_MIN_COLUMN_WIDTH })
+  })
+
+  it('honors a per-column minWidth override', () => {
+    const { container } = render(
+      <DataTable
+        columns={[{
+          id: 'name',
+          label: 'Name',
+          type: 'text',
+          width: '100px',
+          minWidth: '180px',
+        }]}
+        data={[{ id: '1', name: 'Alice' }]}
+        rowKey="id"
+        storageKey="custom-minimum"
+        preset="minimal"
+      />,
+    )
+
+    expect(container.querySelector('col')).toHaveStyle({ width: '180px' })
+    expect(container.querySelector('table')).toHaveStyle({ minWidth: 'calc(180px)' })
+  })
+
+  it('uses min-width-clamped painted widths for three frozen-column offsets', () => {
+    const frozenColumns: ColumnDef[] = [
+      { id: 'name', label: 'Name', type: 'text', width: '80px' },
+      { id: 'amount', label: 'Amount', type: 'number', width: '100px' },
+      { id: 'status', label: 'Status', type: 'text', width: '120px' },
+    ]
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        return { width: Number.parseFloat(this.style.width) || 0 } as DOMRect
+      })
+
+    try {
+      render(
+        <DataTable
+          columns={frozenColumns}
+          data={[{ id: '1', name: 'Alice', amount: 100, status: 'Open' }]}
+          rowKey="id"
+          storageKey="frozen-clamped-three"
+          frozenColumns={3}
+          preset="minimal"
+        />,
+      )
+
+      expect(screen.getByText('Name').closest('th')).toHaveStyle({ left: '0px' })
+      expect(screen.getByText('Amount').closest('th')).toHaveStyle({ left: '140px' })
+      expect(screen.getByText('Status').closest('th')).toHaveStyle({ left: '280px' })
+    } finally {
+      rectSpy.mockRestore()
+    }
+  })
+
+  it('truncates long header labels instead of allowing overlap', () => {
+    render(
+      <DataTable
+        columns={[{
+          id: 'long',
+          label: 'A very long header label that must not overlap',
+          type: 'text',
+          width: '140px',
+        }]}
+        data={[{ id: '1', long: 'Value' }]}
+        rowKey="id"
+        storageKey="header-truncation"
+        preset="minimal"
+      />,
+    )
+
+    expect(screen.getByText('A very long header label that must not overlap')).toHaveClass(
+      'min-w-0',
+      'truncate',
+    )
   })
 
   it('measures auto-width columns for offsets without locking their rendered widths', () => {
@@ -169,12 +353,12 @@ describe('Content', () => {
     expect(nameHeader).toHaveClass('dt-frozen-header', 'z-30')
     expect(nameHeader).toHaveStyle({ position: 'sticky', left: '0px' })
     expect(amountHeader).toHaveClass('dt-frozen-header', 'dt-frozen-edge')
-    expect(amountHeader).toHaveStyle({ position: 'sticky', left: '120px' })
+    expect(amountHeader).toHaveStyle({ position: 'sticky', left: '140px' })
     expect(statusHeader).not.toHaveClass('dt-frozen-header')
     expect(nameCell).toHaveClass('dt-frozen-cell', 'z-10')
     expect(nameCell).toHaveStyle({ position: 'sticky', left: '0px' })
     expect(amountCell).toHaveClass('dt-frozen-cell', 'dt-frozen-edge')
-    expect(amountCell).toHaveStyle({ position: 'sticky', left: '120px' })
+    expect(amountCell).toHaveStyle({ position: 'sticky', left: '140px' })
     expect(screen.getByText('Open').closest('td')).toHaveClass('relative', 'z-0')
   })
 
@@ -232,8 +416,8 @@ describe('Content', () => {
     fireEvent.mouseMove(document, { clientX: 180 })
     fireEvent.mouseUp(document)
 
-    expect(screen.getByText('Amount').closest('th')).toHaveStyle({ left: '200px' })
-    expect(screen.getByText('100').closest('td')).toHaveStyle({ left: '200px' })
+    expect(screen.getByText('Amount').closest('th')).toHaveStyle({ left: '220px' })
+    expect(screen.getByText('100').closest('td')).toHaveStyle({ left: '220px' })
   })
 
   it('recomputes the frozen set and offsets after order and visibility changes', () => {
@@ -259,14 +443,14 @@ describe('Content', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Move Status up' }))
 
     expect(screen.getByRole('columnheader', { name: /Status/ })).toHaveStyle({ left: '0px' })
-    expect(screen.getByRole('columnheader', { name: /Name/ })).toHaveStyle({ left: '100px' })
+    expect(screen.getByRole('columnheader', { name: /Name/ })).toHaveStyle({ left: '140px' })
     expect(screen.getByRole('columnheader', { name: /Amount/ })).not.toHaveClass('dt-frozen-header')
 
     fireEvent.click(screen.getByRole('button', { name: 'Toggle Status visibility' }))
 
     expect(screen.queryByRole('columnheader', { name: /Status/ })).not.toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: /Name/ })).toHaveStyle({ left: '0px' })
-    expect(screen.getByRole('columnheader', { name: /Amount/ })).toHaveStyle({ left: '120px' })
+    expect(screen.getByRole('columnheader', { name: /Amount/ })).toHaveStyle({ left: '140px' })
   })
 
   it('never freezes the generated actions pseudo-column', () => {
@@ -314,9 +498,9 @@ describe('Content', () => {
     const groupCells = groupRow.querySelectorAll('td')
     expect(groupCells).toHaveLength(3)
     expect(groupCells[0]).toHaveClass('dt-group-frozen-cell', 'z-20')
-    expect(groupCells[0]).toHaveStyle({ left: '0px', width: '120px' })
+    expect(groupCells[0]).toHaveStyle({ left: '0px', width: '140px' })
     expect(groupCells[1]).toHaveClass('dt-group-frozen-cell', 'dt-frozen-edge')
-    expect(groupCells[1]).toHaveStyle({ left: '120px', width: '80px' })
+    expect(groupCells[1]).toHaveStyle({ left: '140px', width: '140px' })
     expect(screen.getByText('Alice').closest('td')).toHaveClass('dt-frozen-cell')
   })
 
