@@ -52,11 +52,13 @@ function DataTableRoot<T extends object = RowData>({
   onRowContextMenu,
   onCellEdit,
   onCellEditError,
+  columnMenuItems,
   toolbarExtra,
   footerKpis,
   className,
   children,
 }: DataTableProps<T>) {
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const [uncontrolledViewMode, setUncontrolledViewMode] = useState<'table' | 'kanban'>(() => {
     try {
       const saved = localStorage.getItem(`${storageKey}-viewmode`)
@@ -208,6 +210,7 @@ function DataTableRoot<T extends object = RowData>({
     if (ids.length === 0) return
     attachmentAdapter.getCounts(ids).then(setAttachmentCounts).catch(() => {})
   }, [attachmentAdapter, data, rowKey])
+  const openFilterPanel = useCallback(() => setFilterMenuOpen(true), [])
 
   // Load attachment counts on mount and when data changes
   useEffect(() => {
@@ -241,6 +244,8 @@ function DataTableRoot<T extends object = RowData>({
       onRowClick,
       onCellEdit,
       onCellEditError,
+      columnMenuItems,
+      openFilterPanel,
     }),
     [
       data,
@@ -264,6 +269,8 @@ function DataTableRoot<T extends object = RowData>({
       onRowClick,
       onCellEdit,
       onCellEditError,
+      columnMenuItems,
+      openFilterPanel,
     ],
   )
 
@@ -299,6 +306,8 @@ function DataTableRoot<T extends object = RowData>({
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               hasKanban={kanban !== undefined}
+              filterMenuOpen={filterMenuOpen}
+              setFilterMenuOpen={setFilterMenuOpen}
             />
             {bulkActions && viewMode === 'table' && <BulkActionBar<T> actions={bulkActions} />}
           </div>
@@ -342,6 +351,8 @@ function FullPreset<T extends object>({
   viewMode,
   onViewModeChange,
   hasKanban,
+  filterMenuOpen,
+  setFilterMenuOpen,
 }: {
   onRowClick?: (row: T) => void
   toolbarExtra?: React.ReactNode
@@ -349,9 +360,10 @@ function FullPreset<T extends object>({
   viewMode: 'table' | 'kanban'
   onViewModeChange: (viewMode: 'table' | 'kanban') => void
   hasKanban: boolean
+  filterMenuOpen: boolean
+  setFilterMenuOpen: (open: boolean) => void
 }) {
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
-  const [filterMenuOpen, setFilterMenuOpen] = useState(false)
 
   return (
     <>

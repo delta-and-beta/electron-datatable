@@ -1,9 +1,10 @@
-import { useState, type ReactElement } from 'react'
+import { useState } from 'react'
 import { Check, Copy, Eye, MoreHorizontal, Pencil, Star, Trash2 } from 'lucide-react'
 import { useDataTable } from '../context'
 import type { DataTableRowHeight } from '../types'
 import { cn } from '../lib/utils'
 import { Popover } from './Popover'
+import { MenuItem } from './MenuItem'
 
 const ROW_HEIGHTS: Array<{ value: DataTableRowHeight; label: string }> = [
   { value: 'short', label: 'Short' },
@@ -105,13 +106,13 @@ export function ViewsMenu() {
                     <MoreHorizontal className="h-4 w-4" />
                   </summary>
                   <div className="absolute right-0 z-10 mt-1 w-36 rounded-md border border-dt-border bg-dt-bg-secondary p-1 shadow-lg">
-                    <ViewAction icon={<Pencil />} label="Rename" onClick={() => {
+                    <MenuItem icon={<Pencil />} label="Rename" onSelect={() => {
                       setEditingId(view.id)
                       setEditingName(view.name)
                     }} />
-                    <ViewAction icon={<Copy />} label="Duplicate" onClick={() => views.duplicate(view.id)} />
-                    <ViewAction icon={<Star />} label="Set default" onClick={() => views.setDefault(view.id)} />
-                    <ViewAction icon={<Trash2 />} label="Delete" danger onClick={() => views.remove(view.id)} />
+                    <MenuItem icon={<Copy />} label="Duplicate" onSelect={() => views.duplicate(view.id)} />
+                    <MenuItem icon={<Star />} label="Set default" onSelect={() => views.setDefault(view.id)} />
+                    <MenuItem icon={<Trash2 />} label="Delete" variant="danger" onSelect={() => views.remove(view.id)} />
                   </div>
                 </details>
               </div>
@@ -164,32 +165,6 @@ export function ViewsMenu() {
         </div>
       </div>
     </Popover>
-  )
-}
-
-function ViewAction({
-  icon,
-  label,
-  onClick,
-  danger = false,
-}: {
-  icon: ReactElement
-  label: string
-  onClick: () => void
-  danger?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-dt-bg',
-        danger && 'text-dt-negative',
-      )}
-    >
-      <span className="[&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span>
-      {label}
-    </button>
   )
 }
 

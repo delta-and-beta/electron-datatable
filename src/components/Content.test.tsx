@@ -37,7 +37,7 @@ describe('Content', () => {
 
   it('sort header button triggers sort state change', () => {
     render(<DataTable columns={columns} data={data} rowKey="id" preset="minimal" />)
-    const sortButton = screen.getByRole('button', { name: /Name/i })
+    const sortButton = screen.getByRole('button', { name: 'Name' })
     fireEvent.click(sortButton)
     const nameHeader = sortButton.closest('th')!
     expect(nameHeader).toHaveAttribute('aria-sort', 'ascending')

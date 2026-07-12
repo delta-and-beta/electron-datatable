@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] - 2026-07-12
+
+### Added
+
+- Column headers now provide built-in sort, filter, group, freeze, and hide
+  actions plus a `columnMenuItems` consumer extension point.
+- `MenuItem` and `FieldEditor` primitives provide reusable menu rows and a
+  source-neutral field form with an injected, searchable type catalog.
+- Inferred columns retain source `writable` metadata while preventing display
+  overrides from making non-writable fields editable.
+
 ## [0.12.0] - 2026-07-12
 
 ### Fixed
