@@ -4,6 +4,7 @@ import type {
   AirtableSyncAdapterOptions,
   SQLiteClient,
   SourceColumnType,
+  SourceColumn,
   SyncAdapter,
   SyncPushChange,
   SyncPushRecordResult,
@@ -44,6 +45,18 @@ void assertRawSelectIsRejected
 
 const sourceColumnType: SourceColumnType = 'tags'
 void sourceColumnType
+
+const sourceColumnMetadata = {
+  name: 'Stage',
+  sourceType: 'string',
+  metadata: {
+    fieldId: 'fldStage',
+    description: 'Current pipeline stage',
+    options: ['Lead'],
+    airtableOptions: { choices: [{ id: 'selLead', name: 'Lead' }] },
+  },
+} satisfies SourceColumn
+void sourceColumnMetadata
 
 const airtableClient = { async request(_path: string, _params?: Record<string, string>) { return {} } } satisfies AirtableClient
 const airtableOptions = {

@@ -26,13 +26,15 @@ interface AirtablePushResponse {
 }
 
 interface AirtableField {
+  id?: string
   name: string
+  description?: string
   type: string
   isComputed?: boolean
-  options?: {
+  options?: Record<string, unknown> & {
     symbol?: string
     precision?: number
-    choices?: Array<{ name: string }>
+    choices?: Array<Record<string, unknown> & { name: string }>
   }
 }
 
@@ -212,6 +214,20 @@ export class AirtableSyncAdapter implements SyncAdapter {
         { name: 'airtable_id', sourceType: 'string', writable: false, fieldKind: 'recordId' },
         ...table.fields.map((field) => {
           const type = sourceType(field.type)
+          const metadata = {
+            ...(field.id === undefined ? {} : { fieldId: field.id }),
+            ...(field.description === undefined ? {} : { description: field.description }),
+            ...(field.options === undefined ? {} : { airtableOptions: field.options }),
+            ...(type === 'currency'
+              ? {
+                  symbol: field.options?.symbol,
+                  precision: field.options?.precision,
+                }
+              : {}),
+            ...(field.options?.choices === undefined
+              ? {}
+              : { options: field.options.choices.map(({ name }) => name) }),
+          }
           return {
             name: field.name,
             sourceType: type,
@@ -220,21 +236,7 @@ export class AirtableSyncAdapter implements SyncAdapter {
               && !computedTypes.has(field.type)
               && field.type !== 'multipleRecordLinks'
               && !(field.type === 'barcode' && field.isComputed === true),
-            ...(type === 'currency' || field.options?.choices !== undefined
-              ? {
-                  metadata: {
-                    ...(type === 'currency'
-                      ? {
-                          symbol: field.options?.symbol,
-                          precision: field.options?.precision,
-                        }
-                      : {}),
-                    ...(field.options?.choices === undefined
-                      ? {}
-                      : { options: field.options.choices.map(({ name }) => name) }),
-                  },
-                }
-              : {}),
+            ...(Object.keys(metadata).length === 0 ? {} : { metadata }),
           }
         }),
       ],

@@ -485,10 +485,54 @@ describe('AirtableSyncAdapter', () => {
           'futureFieldType',
         ].includes(fieldKind),
         ...(sourceType === 'currency'
-          ? { metadata: { symbol: '$', precision: 2 } }
+          ? {
+              metadata: {
+                symbol: '$',
+                precision: 2,
+                airtableOptions: { symbol: '$', precision: 2 },
+              },
+            }
           : {}),
       })),
     ])
+  })
+
+  it('retains Airtable field identity, description, and raw options in source metadata', async () => {
+    const airtableOptions = {
+      choices: [{ id: 'selLead', name: 'Lead', color: 'blueLight' }],
+    }
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [{
+        id: 'fldStage',
+        name: 'Stage',
+        description: 'Current pipeline stage',
+        type: 'singleSelect',
+        options: airtableOptions,
+      }],
+    }] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+
+    const schema = await adapter.describeSchema()
+
+    expect(schema.columns).toContainEqual({
+      name: 'Stage',
+      sourceType: 'string',
+      fieldKind: 'singleSelect',
+      writable: true,
+      metadata: {
+        fieldId: 'fldStage',
+        description: 'Current pipeline stage',
+        options: ['Lead'],
+        airtableOptions,
+      },
+    })
   })
 
   it('marks computed barcode metadata as non-writable', async () => {
@@ -540,7 +584,11 @@ describe('AirtableSyncAdapter', () => {
       sourceType: 'currency',
       fieldKind: 'currency',
       writable: true,
-      metadata: { symbol: 'HK$', precision: 3 },
+      metadata: {
+        symbol: 'HK$',
+        precision: 3,
+        airtableOptions: { symbol: 'HK$', precision: 3 },
+      },
     })
     expect(inferColumns(schema)).toContainEqual(expect.objectContaining({
       id: 'Budget',

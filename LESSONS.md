@@ -16,3 +16,6 @@ Delete the line when the feature ships.
 - Keyboard record navigation: arrow-key row focus + Enter opens the row. (gap matrix 2026-07-11)
 - CSV export / print of the current view. (gap matrix 2026-07-11)
 - Airtable sync adapter: fifth /sync adapter (Meta API schema, listRecords offset cursor, injected fetch client, snapshotConsistent:false). In build 2026-07-11.
+- Source adapters must retain stable field IDs, descriptions, and raw options
+  from schema discovery so consumers do not repeat the same Meta API request.
+  (from company-app R8)

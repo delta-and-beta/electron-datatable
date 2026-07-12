@@ -7,10 +7,16 @@ export interface SourceColumn {
   /** Adapter-native field type, retained for editor and write semantics. */
   fieldKind?: string
   metadata?: {
+    /** Adapter-native stable field identifier, when available. */
+    fieldId?: string
+    /** Source-provided field description, when available. */
+    description?: string
     symbol?: string
     precision?: number
     /** Existing option names reported by the source schema. */
     options?: string[]
+    /** Raw Airtable field options retained for schema-editing consumers. */
+    airtableOptions?: Record<string, unknown>
   }
 }
 

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.13.1] - 2026-07-12
+
+### Fixed
+
+- Column header menus omit the field-filter action when the table has no
+  mounted filter panel, preventing invisible conditions in minimal layouts.
+- Airtable source schemas retain stable field IDs, descriptions, and raw field
+  options alongside backward-compatible normalized metadata.
+
 ## [0.13.0] - 2026-07-12
 
 ### Added
