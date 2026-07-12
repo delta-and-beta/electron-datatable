@@ -33,34 +33,46 @@ describe('AirtableSyncAdapter', () => {
     expect(writable.pushBatchSize).toBe(10)
   })
 
-  it('pins the PATCH body shape, typecast flag, and defensive airtable_id stripping', async () => {
-    const requestWithBody = vi.fn().mockResolvedValue({ records: [
-      { id: 'rec1', fields: { Name: 'Updated' } },
-    ] })
-    const adapter = new AirtableSyncAdapter({
-      client: createMockClient({ requestWithBody }),
-      baseId: 'appBase',
-      table: 'Companies',
-      interPageDelayMs: 0,
-    })
-
-    await expect(adapter.push([{ externalId: 'rec1', fields: {
-      airtable_id: 'must-not-leak',
-      Name: 'Updated',
-    } }])).resolves.toEqual([{ externalId: 'rec1', ok: true }])
-    expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/Companies', {
-      records: [{ id: 'rec1', fields: { Name: 'Updated' } }],
-      typecast: true,
-    })
-  })
-
-  it('drops computed fields from pushes after caching Airtable metadata', async () => {
+  it('loads schema on a cold push, drops computed fields, and defaults typecast off', async () => {
     const request = vi.fn().mockResolvedValue({ tables: [{
       id: 'tblCompanies',
       name: 'Companies',
       fields: [
         { name: 'Name', type: 'singleLineText' },
         { name: 'Score', type: 'formula' },
+      ],
+    }] })
+    const requestWithBody = vi.fn().mockResolvedValue({ records: [
+      { id: 'rec1', fields: { Name: 'Updated' } },
+    ] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request, requestWithBody }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+
+    await expect(adapter.push([{ externalId: 'rec1', fields: {
+      airtable_id: 'must-not-leak',
+      Name: 'Updated',
+      Score: 99,
+    } }])).resolves.toEqual([{ externalId: 'rec1', ok: true }])
+    expect(request).toHaveBeenCalledOnce()
+    expect(request).toHaveBeenCalledWith('meta/bases/appBase/tables')
+    expect(request.mock.invocationCallOrder[0]).toBeLessThan(requestWithBody.mock.invocationCallOrder[0])
+    expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/tblCompanies', {
+      records: [{ id: 'rec1', fields: { Name: 'Updated' } }],
+      typecast: false,
+    })
+  })
+
+  it('never sends fields whose schema entry or field kind is unknown', async () => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [
+        { name: 'Name', type: 'singleLineText' },
+        { name: 'Mystery', type: 'futureFieldType' },
       ],
     }] })
     const requestWithBody = vi.fn().mockResolvedValue({ records: [{ id: 'rec1', fields: {} }] })
@@ -70,22 +82,21 @@ describe('AirtableSyncAdapter', () => {
       table: 'tblCompanies',
       interPageDelayMs: 0,
     })
-    await adapter.describeSchema()
 
     await expect(adapter.push([{ externalId: 'rec1', fields: {
       Name: 'Updated',
-      Score: 99,
+      Mystery: 'not-safe',
+      NotInSchema: 'not-safe',
     } }])).resolves.toEqual([{ externalId: 'rec1', ok: true }])
 
     expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/tblCompanies', {
       records: [{ id: 'rec1', fields: { Name: 'Updated' } }],
-      typecast: true,
+      typecast: false,
     })
   })
 
   it.each([
     ['Tags', 'multipleSelects', 'Gold'],
-    ['Owner', 'multipleRecordLinks', 'recOwner'],
     ['Stage', 'singleSelect', ['Won']],
   ])('rejects wrong-shaped %s values per record without sending them', async (field, fieldKind, value) => {
     const request = vi.fn().mockResolvedValue({ tables: [{
@@ -93,7 +104,7 @@ describe('AirtableSyncAdapter', () => {
       name: 'Companies',
       fields: [
         { name: 'Name', type: 'singleLineText' },
-        { name: field, type: fieldKind },
+        { name: field, type: fieldKind, options: { choices: [{ name: 'Won' }, { name: 'Gold' }] } },
       ],
     }] })
     const requestWithBody = vi.fn().mockResolvedValue({ records: [{ id: 'recGood', fields: {} }] })
@@ -103,32 +114,57 @@ describe('AirtableSyncAdapter', () => {
       table: 'tblCompanies',
       interPageDelayMs: 0,
     })
-    await adapter.describeSchema()
-
     const results = await adapter.push([
       { externalId: 'recBad', fields: { [field]: value } },
       { externalId: 'recGood', fields: { Name: 'Safe' } },
     ])
 
     expect(results).toEqual([
-      { externalId: 'recBad', ok: false, error: expect.stringContaining(`${field} must be`) },
+      { externalId: 'recBad', ok: false, error: expect.stringContaining(`${field} has`) },
       { externalId: 'recGood', ok: true },
     ])
     expect(requestWithBody).toHaveBeenCalledOnce()
     expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/tblCompanies', {
       records: [{ id: 'recGood', fields: { Name: 'Safe' } }],
-      typecast: true,
+      typecast: false,
     })
   })
 
-  it('sends correctly shaped select and link values with typecast disabled', async () => {
+  it.each([
+    ['singleSelect', 'New option'],
+    ['multipleSelects', ['Won', 'New option']],
+  ])('rejects a new %s option on a cold push without writing', async (fieldKind, value) => {
     const request = vi.fn().mockResolvedValue({ tables: [{
       id: 'tblCompanies',
       name: 'Companies',
       fields: [
-        { name: 'Tags', type: 'multipleSelects' },
-        { name: 'Owner', type: 'multipleRecordLinks' },
-        { name: 'Stage', type: 'singleSelect' },
+        { name: 'Stage', type: fieldKind, options: { choices: [{ name: 'Open' }, { name: 'Won' }] } },
+      ],
+    }] })
+    const requestWithBody = vi.fn()
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request, requestWithBody }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+
+    await expect(adapter.push([{ externalId: 'rec1', fields: { Stage: value } }]))
+      .resolves.toEqual([{
+        externalId: 'rec1',
+        ok: false,
+        error: 'value is not an existing option for Stage',
+      }])
+    expect(requestWithBody).not.toHaveBeenCalled()
+  })
+
+  it('sends existing single- and multiple-select options on a cold push with typecast disabled', async () => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [
+        { name: 'Stage', type: 'singleSelect', options: { choices: [{ name: 'Open' }, { name: 'Won' }] } },
+        { name: 'Tags', type: 'multipleSelects', options: { choices: [{ name: 'Gold' }, { name: 'Priority' }] } },
       ],
     }] })
     const requestWithBody = vi.fn().mockResolvedValue({ records: [{ id: 'rec1', fields: {} }] })
@@ -138,25 +174,114 @@ describe('AirtableSyncAdapter', () => {
       table: 'tblCompanies',
       interPageDelayMs: 0,
     })
-    await adapter.describeSchema()
 
-    await adapter.push([{ externalId: 'rec1', fields: {
-      Tags: ['Gold'],
-      Owner: ['recOwner'],
+    await expect(adapter.push([{ externalId: 'rec1', fields: {
       Stage: 'Won',
-    } }])
+      Tags: ['Gold', 'Priority'],
+    } }]))
+      .resolves.toEqual([{ externalId: 'rec1', ok: true }])
 
     expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/tblCompanies', {
-      records: [{ id: 'rec1', fields: {
-        Tags: ['Gold'],
-        Owner: ['recOwner'],
-        Stage: 'Won',
-      } }],
+      records: [{ id: 'rec1', fields: { Stage: 'Won', Tags: ['Gold', 'Priority'] } }],
       typecast: false,
     })
   })
 
+  it('validates collaborator shapes and keeps typecast disabled', async () => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [
+        { name: 'Owner', type: 'singleCollaborator' },
+        { name: 'Reviewers', type: 'multipleCollaborators' },
+      ],
+    }] })
+    const requestWithBody = vi.fn().mockResolvedValue({ records: [{ id: 'recGood', fields: {} }] })
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request, requestWithBody }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+
+    await expect(adapter.push([
+      { externalId: 'recBad', fields: { Owner: 'usr1' } },
+      {
+        externalId: 'recGood',
+        fields: { Owner: { id: 'usr1' }, Reviewers: [{ id: 'usr2' }] },
+      },
+    ])).resolves.toEqual([
+      {
+        externalId: 'recBad',
+        ok: false,
+        error: 'Owner has an invalid value shape for Airtable singleCollaborator',
+      },
+      { externalId: 'recGood', ok: true },
+    ])
+    expect(requestWithBody).toHaveBeenCalledWith('PATCH', 'appBase/tblCompanies', {
+      records: [{
+        id: 'recGood',
+        fields: { Owner: { id: 'usr1' }, Reviewers: [{ id: 'usr2' }] },
+      }],
+      typecast: false,
+    })
+  })
+
+  it('fails every record closed when cold-push schema loading fails', async () => {
+    const request = vi.fn().mockRejectedValue(Object.assign(new Error('Meta unavailable'), { status: 403 }))
+    const requestWithBody = vi.fn()
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request, requestWithBody }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+
+    await expect(adapter.push([
+      { externalId: 'rec1', fields: { Name: 'One' } },
+      { externalId: 'rec2', fields: { Name: 'Two' } },
+    ])).resolves.toEqual([
+      { externalId: 'rec1', ok: false, error: 'Airtable schema load failed: Meta unavailable' },
+      { externalId: 'rec2', ok: false, error: 'Airtable schema load failed: Meta unavailable' },
+    ])
+    expect(requestWithBody).not.toHaveBeenCalled()
+  })
+
+  it('marks record-link columns non-writable and never pushes them', async () => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [{ name: 'Owner', type: 'multipleRecordLinks' }],
+    }] })
+    const requestWithBody = vi.fn()
+    const adapter = new AirtableSyncAdapter({
+      client: createMockClient({ request, requestWithBody }),
+      baseId: 'appBase',
+      table: 'tblCompanies',
+      interPageDelayMs: 0,
+    })
+
+    await expect(adapter.push([{ externalId: 'rec1', fields: { Owner: ['recOwner'] } }]))
+      .resolves.toEqual([{ externalId: 'rec1', ok: true }])
+    expect(requestWithBody).not.toHaveBeenCalled()
+    await expect(adapter.describeSchema()).resolves.toEqual({
+      columns: [
+        { name: 'airtable_id', sourceType: 'string', writable: false, fieldKind: 'recordId' },
+        { name: 'Owner', sourceType: 'tags', writable: false, fieldKind: 'multipleRecordLinks' },
+      ],
+    })
+    expect(request).toHaveBeenCalledOnce()
+    expect(inferColumns(await adapter.describeSchema(), { Owner: { editable: true } }))
+      .toContainEqual(expect.objectContaining({ id: 'Owner', editable: false }))
+    expect(request).toHaveBeenCalledOnce()
+  })
+
   it('retries a rejected batch as individual records to isolate a 422 offender', async () => {
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [{ name: 'Name', type: 'singleLineText' }],
+    }] })
     const requestWithBody = vi.fn()
       .mockRejectedValueOnce(Object.assign(new Error('invalid request'), { status: 422 }))
       .mockResolvedValueOnce({ records: [{ id: 'recGood', fields: { Name: 'Good' } }] })
@@ -165,9 +290,9 @@ describe('AirtableSyncAdapter', () => {
         response: { error: { message: 'Name cannot be blank' } },
       }))
     const adapter = new AirtableSyncAdapter({
-      client: createMockClient({ requestWithBody }),
+      client: createMockClient({ request, requestWithBody }),
       baseId: 'appBase',
-      table: 'Companies',
+      table: 'tblCompanies',
       interPageDelayMs: 0,
     })
 
@@ -187,13 +312,18 @@ describe('AirtableSyncAdapter', () => {
 
   it('honors the rate-limit cooldown when pushing', async () => {
     vi.useFakeTimers()
+    const request = vi.fn().mockResolvedValue({ tables: [{
+      id: 'tblCompanies',
+      name: 'Companies',
+      fields: [{ name: 'Name', type: 'singleLineText' }],
+    }] })
     const requestWithBody = vi.fn()
       .mockRejectedValueOnce(Object.assign(new Error('rate limited'), { status: 429 }))
       .mockResolvedValueOnce({ records: [{ id: 'rec1', fields: {} }] })
     const adapter = new AirtableSyncAdapter({
-      client: createMockClient({ requestWithBody }),
+      client: createMockClient({ request, requestWithBody }),
       baseId: 'appBase',
-      table: 'Companies',
+      table: 'tblCompanies',
       interPageDelayMs: 0,
       rateLimitDelayMs: 500,
     })
@@ -350,7 +480,9 @@ describe('AirtableSyncAdapter', () => {
           'createdBy',
           'lastModifiedBy',
           'multipleLookupValues',
+          'multipleRecordLinks',
           'button',
+          'futureFieldType',
         ].includes(fieldKind),
         ...(sourceType === 'currency'
           ? { metadata: { symbol: '$', precision: 2 } }

@@ -80,4 +80,16 @@ describe('inferColumns', () => {
       }),
     ])
   })
+
+  it('carries source schema option names into inferred editors', () => {
+    expect(inferColumns({ columns: [{
+      name: 'Stage',
+      sourceType: 'string',
+      fieldKind: 'singleSelect',
+      metadata: { options: ['Open', 'Won'] },
+    }] })).toEqual([expect.objectContaining({
+      id: 'Stage',
+      options: ['Open', 'Won'],
+    })])
+  })
 })

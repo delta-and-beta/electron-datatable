@@ -32,6 +32,7 @@ interface AirtableField {
   options?: {
     symbol?: string
     precision?: number
+    choices?: Array<{ name: string }>
   }
 }
 
@@ -75,8 +76,44 @@ const computedTypes = new Set([
   'multipleLookupValues',
   'button',
 ])
-const arrayFieldKinds = new Set(['multipleSelects', 'multipleRecordLinks'])
-const typecastSensitiveFieldKinds = new Set([...arrayFieldKinds, 'singleSelect'])
+const selectFieldKinds = new Set(['singleSelect', 'multipleSelects'])
+const collaboratorFieldKinds = new Set(['singleCollaborator', 'multipleCollaborators'])
+const knownWritableFieldKinds = new Set([
+  'singleLineText',
+  'multilineText',
+  'richText',
+  'email',
+  'url',
+  'phoneNumber',
+  'singleSelect',
+  'multipleSelects',
+  'number',
+  'currency',
+  'percent',
+  'rating',
+  'duration',
+  'date',
+  'dateTime',
+  'checkbox',
+  'barcode',
+  'multipleAttachments',
+  ...collaboratorFieldKinds,
+])
+const safeTypecastFieldKinds = new Set([
+  'singleLineText',
+  'multilineText',
+  'richText',
+  'email',
+  'url',
+  'phoneNumber',
+  'number',
+  'currency',
+  'percent',
+  'rating',
+  'duration',
+  'date',
+  'dateTime',
+])
 
 function sourceType(type: string): SourceColumnType {
   if (stringTypes.has(type)) return 'string'
@@ -126,6 +163,8 @@ export class AirtableSyncAdapter implements SyncAdapter {
   private readonly rateLimitDelayMs: number
   private lastRequestAt: number | undefined
   private schemaColumns: Map<string, SourceSchema['columns'][number]> | undefined
+  private schema: SourceSchema | undefined
+  private schemaPromise: Promise<SourceSchema> | undefined
 
   constructor(private readonly options: AirtableSyncAdapterOptions) {
     this.id = `airtable:${options.baseId}/${options.table}`
@@ -141,6 +180,27 @@ export class AirtableSyncAdapter implements SyncAdapter {
   }
 
   async describeSchema(): Promise<SourceSchema> {
+    return this.ensureSchema()
+  }
+
+  private async ensureSchema(): Promise<SourceSchema> {
+    if (this.schema !== undefined) return this.schema
+    if (this.schemaPromise === undefined) {
+      this.schemaPromise = this.loadSchema()
+        .then((schema) => {
+          this.schema = schema
+          this.schemaColumns = new Map(schema.columns.map((column) => [column.name, column]))
+          return schema
+        })
+        .catch((error: unknown) => {
+          this.schemaPromise = undefined
+          throw error
+        })
+    }
+    return this.schemaPromise
+  }
+
+  private async loadSchema(): Promise<SourceSchema> {
     const response = await this.request(`meta/bases/${this.options.baseId}/tables`) as AirtableMetaResponse
     const table = response.tables.find(({ id, name }) => id === this.options.table || name === this.options.table)
     if (table === undefined) {
@@ -156,13 +216,22 @@ export class AirtableSyncAdapter implements SyncAdapter {
             name: field.name,
             sourceType: type,
             fieldKind: field.type,
-            writable: !computedTypes.has(field.type)
+            writable: knownWritableFieldKinds.has(field.type)
+              && !computedTypes.has(field.type)
+              && field.type !== 'multipleRecordLinks'
               && !(field.type === 'barcode' && field.isComputed === true),
-            ...(type === 'currency'
+            ...(type === 'currency' || field.options?.choices !== undefined
               ? {
                   metadata: {
-                    symbol: field.options?.symbol,
-                    precision: field.options?.precision,
+                    ...(type === 'currency'
+                      ? {
+                          symbol: field.options?.symbol,
+                          precision: field.options?.precision,
+                        }
+                      : {}),
+                    ...(field.options?.choices === undefined
+                      ? {}
+                      : { options: field.options.choices.map(({ name }) => name) }),
                   },
                 }
               : {}),
@@ -170,7 +239,6 @@ export class AirtableSyncAdapter implements SyncAdapter {
         }),
       ],
     }
-    this.schemaColumns = new Map(schema.columns.map((column) => [column.name, column]))
     return schema
   }
 
@@ -201,6 +269,14 @@ export class AirtableSyncAdapter implements SyncAdapter {
     if (this.options.client.requestWithBody === undefined) {
       throw new TypeError(`Airtable adapter "${this.id}" requires client.requestWithBody for push`)
     }
+    if (changes.length === 0) return []
+
+    try {
+      await this.ensureSchema()
+    } catch (error) {
+      const message = `Airtable schema load failed: ${this.getErrorMessage(error)}`
+      return changes.map(({ externalId }) => ({ externalId, ok: false, error: message }))
+    }
 
     const results: SyncPushRecordResult[] = []
     for (let index = 0; index < changes.length; index += this.pushBatchSize) {
@@ -211,11 +287,11 @@ export class AirtableSyncAdapter implements SyncAdapter {
         ? []
         : await this.pushBatch(
             valid.map((item) => item.change!),
-            !valid.some((item) => item.disableTypecast),
+            prepared.every((item) => item.allowTypecast),
           )
       let pushedIndex = 0
       for (const item of prepared) {
-        results.push(item.error ?? pushed[pushedIndex++])
+        results.push(item.result ?? pushed[pushedIndex++])
       }
     }
     return results
@@ -223,42 +299,84 @@ export class AirtableSyncAdapter implements SyncAdapter {
 
   private prepareChange(change: SyncPushChange): {
     change?: SyncPushChange
-    disableTypecast: boolean
-    error?: SyncPushRecordResult
+    allowTypecast: boolean
+    result?: SyncPushRecordResult
   } {
     const fields: Record<string, unknown> = {}
-    let disableTypecast = false
+    let allowTypecast = true
     for (const [name, value] of Object.entries(change.fields)) {
       if (name === 'airtable_id') continue
       const schemaColumn = this.schemaColumns?.get(name)
-      if (schemaColumn?.writable === false) continue
       const fieldKind = schemaColumn?.fieldKind
-      if (fieldKind !== undefined && typecastSensitiveFieldKinds.has(fieldKind)) {
-        const valid = value === null
-          || (arrayFieldKinds.has(fieldKind)
-            ? Array.isArray(value) && value.every((item) => typeof item === 'string')
-            : typeof value === 'string')
-        if (!valid) {
-          const expected = arrayFieldKinds.has(fieldKind) ? 'an array of strings' : 'a string'
+      if (schemaColumn?.writable !== true || fieldKind === undefined) {
+        allowTypecast = false
+        continue
+      }
+      if (selectFieldKinds.has(fieldKind)) {
+        allowTypecast = false
+        const values = fieldKind === 'multipleSelects' ? value : [value]
+        const validShape = value === null || (
+          Array.isArray(values)
+          && values.every((item) => typeof item === 'string')
+        )
+        if (!validShape) return this.invalidShape(change, name, fieldKind)
+
+        const options = new Set(schemaColumn.metadata?.options ?? [])
+        const hasNewOption = value !== null
+          && (values as unknown[]).some((item) => !options.has(String(item)))
+        if (hasNewOption) {
           return {
-            disableTypecast: false,
-            error: {
+            allowTypecast: false,
+            result: {
               externalId: change.externalId,
               ok: false,
-              error: `${name} must be ${expected} for Airtable ${fieldKind}`,
+              error: `value is not an existing option for ${name}`,
             },
           }
         }
-        disableTypecast = true
+      } else if (collaboratorFieldKinds.has(fieldKind)) {
+        allowTypecast = false
+        const isCollaborator = (item: unknown) => (
+          typeof item === 'object'
+          && item !== null
+          && typeof (item as Record<string, unknown>).id === 'string'
+        )
+        const valid = value === null || (fieldKind === 'multipleCollaborators'
+          ? Array.isArray(value) && value.every(isCollaborator)
+          : isCollaborator(value))
+        if (!valid) return this.invalidShape(change, name, fieldKind)
+      } else if (!safeTypecastFieldKinds.has(fieldKind)) {
+        allowTypecast = false
       }
       fields[name] = value
     }
-    return { change: { ...change, fields }, disableTypecast }
+    if (Object.keys(fields).length === 0) {
+      return {
+        allowTypecast: false,
+        result: { externalId: change.externalId, ok: true },
+      }
+    }
+    return { change: { ...change, fields }, allowTypecast }
+  }
+
+  private invalidShape(
+    change: SyncPushChange,
+    name: string,
+    fieldKind: string,
+  ): { allowTypecast: false; result: SyncPushRecordResult } {
+    return {
+      allowTypecast: false,
+      result: {
+        externalId: change.externalId,
+        ok: false,
+        error: `${name} has an invalid value shape for Airtable ${fieldKind}`,
+      },
+    }
   }
 
   private async pushBatch(
     changes: SyncPushChange[],
-    typecast = true,
+    typecast = false,
   ): Promise<SyncPushRecordResult[]> {
     try {
       const response = await this.requestWithBody('PATCH', `${this.options.baseId}/${this.options.table}`, {

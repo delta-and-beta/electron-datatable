@@ -414,6 +414,79 @@ describe('inline cell editing', () => {
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Edit Status' })).toHaveFocus())
   })
 
+  it('closes the editor and drops its draft when the edited row disappears', async () => {
+    const onCellEdit = vi.fn()
+    const columns: ColumnDef<TestRow>[] = [{ id: 'name', label: 'Name', type: 'text', editable: true }]
+    const view = render(
+      <DataTable
+        columns={columns}
+        data={[row]}
+        rowKey="id"
+        preset="minimal"
+        onCellEdit={onCellEdit}
+      />,
+    )
+
+    fireEvent.doubleClick(screen.getByText('Alice'))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Edit Name' }), {
+      target: { value: 'Stale draft' },
+    })
+    view.rerender(
+      <DataTable
+        columns={columns}
+        data={[]}
+        rowKey="id"
+        preset="minimal"
+        onCellEdit={onCellEdit}
+      />,
+    )
+
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Edit Name' })).not.toBeInTheDocument())
+    view.rerender(
+      <DataTable
+        columns={columns}
+        data={[row]}
+        rowKey="id"
+        preset="minimal"
+        onCellEdit={onCellEdit}
+      />,
+    )
+    expect(screen.queryByRole('textbox', { name: 'Edit Name' })).not.toBeInTheDocument()
+    expect(onCellEdit).not.toHaveBeenCalled()
+  })
+
+  it('closes the editor and drops its draft when the underlying value changes', async () => {
+    const onCellEdit = vi.fn()
+    const columns: ColumnDef<TestRow>[] = [{ id: 'name', label: 'Name', type: 'text', editable: true }]
+    const view = render(
+      <DataTable
+        columns={columns}
+        data={[row]}
+        rowKey="id"
+        preset="minimal"
+        onCellEdit={onCellEdit}
+      />,
+    )
+
+    fireEvent.doubleClick(screen.getByText('Alice'))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Edit Name' }), {
+      target: { value: 'Stale draft' },
+    })
+    view.rerender(
+      <DataTable
+        columns={columns}
+        data={[{ ...row, name: 'Alice from remote' }]}
+        rowKey="id"
+        preset="minimal"
+        onCellEdit={onCellEdit}
+      />,
+    )
+
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Edit Name' })).not.toBeInTheDocument())
+    expect(screen.getByText('Alice from remote')).toBeInTheDocument()
+    expect(onCellEdit).not.toHaveBeenCalled()
+  })
+
   it('commits on blur and clears its transient overlay when data refreshes', async () => {
     const onCellEdit = vi.fn()
     const columns: ColumnDef<TestRow>[] = [{ id: 'name', label: 'Name', type: 'text', editable: true }]

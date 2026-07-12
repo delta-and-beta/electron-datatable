@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-07-12
+
+### Fixed
+
+- Airtable push could send computed fields and create select options via
+  typecast when the schema was not preloaded. Push now loads and caches Meta
+  schema itself, filters fields fail-closed, validates closed option and
+  collaborator values, and keeps typecast off for mutation-sensitive fields.
+- Inline editors now close and discard their draft when the edited row is
+  removed or a background refresh changes the underlying cell value.
+
 ## [0.11.1] - 2026-07-12
 
 ### Fixed
